@@ -53,7 +53,7 @@ class AnnouncementController extends Controller
         }
 
         return response()->json([
-            'message' => 'Announcement created successfully',
+            'message' => 'Pengumuman berhasil dibuat',
             'announcement' => $announcement->load('attachments'),
         ], 201);
     }
@@ -85,7 +85,7 @@ class AnnouncementController extends Controller
         $announcement->update($validated);
 
         return response()->json([
-            'message' => 'Announcement updated successfully',
+            'message' => 'Pengumuman berhasil diperbarui',
             'announcement' => $announcement->load('attachments'),
         ]);
     }
@@ -101,7 +101,7 @@ class AnnouncementController extends Controller
         $announcement->delete();
 
         return response()->json([
-            'message' => 'Announcement deleted successfully',
+            'message' => 'Pengumuman berhasil dihapus',
         ]);
     }
 }

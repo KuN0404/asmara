@@ -35,7 +35,7 @@ class MyAgendaController extends Controller
         $agenda = MyAgenda::create($validated);
 
         return response()->json([
-            'message' => 'My agenda created successfully',
+            'message' => 'Agenda berhasil dibuat',
             'agenda' => $agenda,
         ], 201);
     }
@@ -65,7 +65,7 @@ class MyAgendaController extends Controller
         $agenda->update($validated);
 
         return response()->json([
-            'message' => 'My agenda updated successfully',
+            'message' => 'Agenda berhasil diperbarui',
             'agenda' => $agenda,
         ]);
     }
@@ -76,7 +76,7 @@ class MyAgendaController extends Controller
         $agenda->delete();
 
         return response()->json([
-            'message' => 'My agenda deleted successfully',
+            'message' => 'Agenda berhasil dihapus',
         ]);
     }
 

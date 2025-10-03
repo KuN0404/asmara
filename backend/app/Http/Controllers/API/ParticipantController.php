@@ -26,7 +26,7 @@ class ParticipantController extends Controller
         $participant = Participant::create($validated);
 
         return response()->json([
-            'message' => 'Participant created successfully',
+            'message' => 'Partisipan berhasil dibuat',
             'participant' => $participant,
         ], 201);
     }
@@ -51,7 +51,7 @@ class ParticipantController extends Controller
         $participant->update($validated);
 
         return response()->json([
-            'message' => 'Participant updated successfully',
+            'message' => 'Partisipan berhasil diperbarui',
             'participant' => $participant,
         ]);
     }
@@ -62,7 +62,7 @@ class ParticipantController extends Controller
         $participant->delete();
 
         return response()->json([
-            'message' => 'Participant deleted successfully',
+            'message' => 'Partisipan berhasil dihapus',
         ]);
     }
 }

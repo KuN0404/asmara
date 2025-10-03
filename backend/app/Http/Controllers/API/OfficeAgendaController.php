@@ -74,7 +74,7 @@ class OfficeAgendaController extends Controller
         }
 
         return response()->json([
-            'message' => 'Office agenda created successfully',
+            'message' => 'Agenda berhasil dibuat',
             'agenda' => $agenda->load(['room', 'participants', 'userParticipants', 'attachments']),
         ], 201);
     }
@@ -122,7 +122,7 @@ class OfficeAgendaController extends Controller
         }
 
         return response()->json([
-            'message' => 'Office agenda updated successfully',
+            'message' => 'Agenda berhasil diperbarui',
             'agenda' => $agenda->load(['room', 'participants', 'userParticipants', 'attachments']),
         ]);
     }
@@ -133,7 +133,7 @@ class OfficeAgendaController extends Controller
         $agenda->delete();
 
         return response()->json([
-            'message' => 'Office agenda deleted successfully',
+            'message' => 'Agenda berhasil dihapus',
         ]);
     }
 }

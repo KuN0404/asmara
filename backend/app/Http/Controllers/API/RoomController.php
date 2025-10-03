@@ -29,7 +29,7 @@ class RoomController extends Controller
         $room = Room::create($validated);
 
         return response()->json([
-            'message' => 'Room created successfully',
+            'message' => 'Ruang berhasil dibuat',
             'room' => $room,
         ], 201);
     }
@@ -54,7 +54,7 @@ class RoomController extends Controller
         $room->update($validated);
 
         return response()->json([
-            'message' => 'Room updated successfully',
+            'message' => 'Ruang berhasil diperbarui',
             'room' => $room,
         ]);
     }
@@ -65,7 +65,7 @@ class RoomController extends Controller
         $room->delete();
 
         return response()->json([
-            'message' => 'Room deleted successfully',
+            'message' => 'Ruang berhasil dihapus',
         ]);
     }
 }
