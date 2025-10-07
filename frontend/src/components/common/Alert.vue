@@ -1,86 +1,138 @@
 <template>
-  <div class="item">
-    <i>
-      <slot name="icon"></slot>
-    </i>
-    <div class="details">
-      <h3>
-        <slot name="heading"></slot>
-      </h3>
-      <slot></slot>
+  <Teleport to="body">
+    <div class="alert-container">
+      <TransitionGroup name="alert">
+        <div
+          v-for="notification in notificationStore.notifications"
+          :key="notification.id"
+          class="alert"
+          :class="`alert-${notification.type}`"
+        >
+          <span class="alert-icon">{{ getIcon(notification.type) }}</span>
+          <span class="alert-message">{{ notification.message }}</span>
+          <button
+            class="alert-close"
+            @click="notificationStore.removeNotification(notification.id)"
+          >
+            ×
+          </button>
+        </div>
+      </TransitionGroup>
     </div>
-  </div>
+  </Teleport>
 </template>
 
+<script setup>
+import { useNotificationStore } from '@/stores/notification'
+
+const notificationStore = useNotificationStore()
+
+const getIcon = (type) => {
+  const icons = {
+    success: '✓',
+    error: '✕',
+    warning: '⚠',
+    info: 'ℹ',
+  }
+  return icons[type] || 'ℹ'
+}
+</script>
+
 <style scoped>
-.item {
-  margin-top: 2rem;
+.alert-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
   display: flex;
-  position: relative;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.details {
-  flex: 1;
-  margin-left: 1rem;
-}
-
-i {
+.alert {
   display: flex;
-  place-items: center;
-  place-content: center;
-  width: 32px;
-  height: 32px;
-  color: var(--color-text);
+  align-items: center;
+  gap: 12px;
+  padding: 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 300px;
+  max-width: 500px;
+  background: white;
 }
 
-h3 {
+.alert-success {
+  border-left: 4px solid #059669;
+}
+
+.alert-error {
+  border-left: 4px solid #dc2626;
+}
+
+.alert-warning {
+  border-left: 4px solid #f59e0b;
+}
+
+.alert-info {
+  border-left: 4px solid #1e40af;
+}
+
+.alert-icon {
   font-size: 1.2rem;
-  font-weight: 500;
-  margin-bottom: 0.4rem;
-  color: var(--color-heading);
+  font-weight: bold;
 }
 
-@media (min-width: 1024px) {
-  .item {
-    margin-top: 0;
-    padding: 0.4rem 0 1rem calc(var(--section-gap) / 2);
-  }
+.alert-success .alert-icon {
+  color: #059669;
+}
 
-  i {
-    top: calc(50% - 25px);
-    left: -26px;
-    position: absolute;
-    border: 1px solid var(--color-border);
-    background: var(--color-background);
-    border-radius: 8px;
-    width: 50px;
-    height: 50px;
-  }
+.alert-error .alert-icon {
+  color: #dc2626;
+}
 
-  .item:before {
-    content: ' ';
-    border-left: 1px solid var(--color-border);
-    position: absolute;
-    left: 0;
-    bottom: calc(50% + 25px);
-    height: calc(50% - 25px);
-  }
+.alert-warning .alert-icon {
+  color: #f59e0b;
+}
 
-  .item:after {
-    content: ' ';
-    border-left: 1px solid var(--color-border);
-    position: absolute;
-    left: 0;
-    top: calc(50% + 25px);
-    height: calc(50% - 25px);
-  }
+.alert-info .alert-icon {
+  color: #1e40af;
+}
 
-  .item:first-of-type:before {
-    display: none;
-  }
+.alert-message {
+  flex: 1;
+  color: #1e293b;
+}
 
-  .item:last-of-type:after {
-    display: none;
-  }
+.alert-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.alert-close:hover {
+  color: #1e293b;
+}
+
+.alert-enter-active,
+.alert-leave-active {
+  transition: all 0.3s ease;
+}
+
+.alert-enter-from {
+  opacity: 0;
+  transform: translateX(100px);
+}
+
+.alert-leave-to {
+  opacity: 0;
+  transform: translateX(100px);
 }
 </style>
