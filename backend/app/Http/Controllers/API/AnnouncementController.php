@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\Controller;
+use App\Models\Attachment;
 use App\Models\Announcement;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Storage;
 
 class AnnouncementController extends Controller
@@ -19,44 +20,40 @@ class AnnouncementController extends Controller
         return response()->json($announcements);
     }
 
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'title' => 'required|string',
-            'content' => 'required|string',
-            'media' => 'nullable|file|max:10240',
-            'is_displayed' => 'boolean',
-            'attachments' => 'nullable|array',
-            'attachments.*' => 'file|max:10240',
-        ]);
+public function store(Request $request)
+{
+    $validated = $request->validate([
+        'title' => 'required|string',
+        'content' => 'required|string',
+        'is_displayed' => 'boolean',
+        'attachments' => 'nullable|array',
+        'attachments.*' => 'file|mimes:jpg,jpeg,png,pdf,doc,docx|max:10240',
+    ]);
 
-        $validated['created_by'] = $request->user()->id;
+    $validated['created_by'] = $request->user()->id;
+    $announcement = Announcement::create($validated);
 
-        if ($request->hasFile('media')) {
-            $validated['media'] = $request->file('media')->store('announcements', 'public');
+    // Handle attachments
+    if ($request->hasFile('attachments')) {
+        $attachmentIds = [];
+        foreach ($request->file('attachments') as $file) {
+            $path = $file->store('attachments', 'public');
+            $attachment = Attachment::create([
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $path,
+                'file_type' => $file->getMimeType(),
+                'file_size' => $file->getSize(),
+            ]);
+            $attachmentIds[] = $attachment->id;
         }
-
-        $announcement = Announcement::create($validated);
-
-        // Handle attachments
-        if ($request->hasFile('attachments')) {
-            foreach ($request->file('attachments') as $file) {
-                $path = $file->store('attachments', 'public');
-                $attachment = $announcement->attachments()->create([
-                    'file_name' => $file->getClientOriginalName(),
-                    'file_path' => $path,
-                    'file_type' => $file->getMimeType(),
-                    'file_size' => $file->getSize(),
-                ]);
-                $announcement->attachments()->attach($attachment->id);
-            }
-        }
-
-        return response()->json([
-            'message' => 'Pengumuman berhasil dibuat',
-            'announcement' => $announcement->load('attachments'),
-        ], 201);
+        $announcement->attachments()->attach($attachmentIds);
     }
+
+    return response()->json([
+        'message' => 'Pengumuman berhasil dibuat',
+        'announcement' => $announcement->load('attachments'),
+    ], 201);
+}
 
     public function show($id)
     {
@@ -64,44 +61,129 @@ class AnnouncementController extends Controller
         return response()->json($announcement);
     }
 
-    public function update(Request $request, $id)
-    {
-        $announcement = Announcement::findOrFail($id);
+// public function update(Request $request, $id)
+// {
+//     $announcement = Announcement::findOrFail($id);
 
-        $validated = $request->validate([
-            'title' => 'sometimes|string',
-            'content' => 'sometimes|string',
-            'media' => 'nullable|file|max:10240',
-            'is_displayed' => 'boolean',
-        ]);
+//     $validated = $request->validate([
+//         'title' => 'sometimes|string',
+//         'content' => 'sometimes|string',
+//         'is_displayed' => 'boolean',
+//         'attachments' => 'nullable|array',
+//         'attachments.*' => 'file|mimes:jpg,jpeg,png,pdf,doc,docx|max:10240',
+//     ]);
 
-        if ($request->hasFile('media')) {
-            if ($announcement->media) {
-                Storage::disk('public')->delete($announcement->media);
+//     $announcement->update($validated);
+
+//     // Handle new attachments
+//     if ($request->hasFile('attachments')) {
+//         $attachmentIds = [];
+//         foreach ($request->file('attachments') as $file) {
+//             $path = $file->store('attachments', 'public');
+//             $attachment = Attachment::create([
+//                 'file_name' => $file->getClientOriginalName(),
+//                 'file_path' => $path,
+//                 'file_type' => $file->getMimeType(),
+//                 'file_size' => $file->getSize(),
+//             ]);
+//             $attachmentIds[] = $attachment->id;
+//         }
+//         // Sync akan replace semua attachment lama dengan yang baru
+//         // Atau gunakan attach() jika mau tambah tanpa hapus yang lama
+//         $announcement->attachments()->sync($attachmentIds);
+//     }
+
+//     return response()->json([
+//         'message' => 'Pengumuman berhasil diperbarui',
+//         'announcement' => $announcement->load('attachments'),
+//     ]);
+// }
+
+public function update(Request $request, $id)
+{
+    $announcement = Announcement::findOrFail($id);
+
+    $validated = $request->validate([
+        'title' => 'sometimes|string',
+        'content' => 'sometimes|string',
+        'is_displayed' => 'boolean',
+        'attachments' => 'nullable|array',
+        'attachments.*' => 'file|mimes:jpg,jpeg,png,pdf,doc,docx|max:10240',
+        'keep_attachment_ids' => 'nullable|array',
+        'keep_attachment_ids.*' => 'integer|exists:attachments,id',
+    ]);
+
+    // Update data announcement
+    $announcement->update([
+        'title' => $validated['title'] ?? $announcement->title,
+        'content' => $validated['content'] ?? $announcement->content,
+        'is_displayed' => $validated['is_displayed'] ?? $announcement->is_displayed,
+    ]);
+
+    // Ambil ID attachment yang akan dipertahankan
+    $keepIds = $request->input('keep_attachment_ids', []);
+
+    // Hapus attachment yang tidak ada di keep_attachment_ids
+    $currentAttachments = $announcement->attachments->pluck('id')->toArray();
+    $toRemove = array_diff($currentAttachments, $keepIds);
+
+    foreach ($toRemove as $attachmentId) {
+        $attachment = Attachment::find($attachmentId);
+        if ($attachment) {
+            // Hapus file dari storage
+            Storage::disk('public')->delete($attachment->file_path);
+
+            // Detach dari announcement
+            $announcement->attachments()->detach($attachmentId);
+
+            // Hapus record jika tidak dipakai announcement lain
+            if ($attachment->announcements()->count() === 0) {
+                $attachment->delete();
             }
-            $validated['media'] = $request->file('media')->store('announcements', 'public');
         }
-
-        $announcement->update($validated);
-
-        return response()->json([
-            'message' => 'Pengumuman berhasil diperbarui',
-            'announcement' => $announcement->load('attachments'),
-        ]);
     }
 
-    public function destroy($id)
-    {
-        $announcement = Announcement::findOrFail($id);
-
-        if ($announcement->media) {
-            Storage::disk('public')->delete($announcement->media);
+    // Handle attachment baru
+    if ($request->hasFile('attachments')) {
+        $newAttachmentIds = [];
+        foreach ($request->file('attachments') as $file) {
+            $path = $file->store('attachments', 'public');
+            $attachment = Attachment::create([
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $path,
+                'file_type' => $file->getMimeType(),
+                'file_size' => $file->getSize(),
+            ]);
+            $newAttachmentIds[] = $attachment->id;
         }
-
-        $announcement->delete();
-
-        return response()->json([
-            'message' => 'Pengumuman berhasil dihapus',
-        ]);
+        // Attach attachment baru tanpa menghapus yang lama
+        $announcement->attachments()->attach($newAttachmentIds);
     }
+
+    return response()->json([
+        'message' => 'Pengumuman berhasil diperbarui',
+        'announcement' => $announcement->load('attachments'),
+    ]);
+}
+
+public function destroy($id)
+{
+    $announcement = Announcement::findOrFail($id);
+
+    // Hapus file attachments dari storage
+    foreach ($announcement->attachments as $attachment) {
+        Storage::disk('public')->delete($attachment->file_path);
+
+        // Hapus record attachment jika tidak dipakai announcement lain
+        if ($attachment->announcements()->count() === 1) {
+            $attachment->delete();
+        }
+    }
+
+    $announcement->delete();
+
+    return response()->json([
+        'message' => 'Pengumuman berhasil dihapus',
+    ]);
+}
 }

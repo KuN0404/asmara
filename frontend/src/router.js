@@ -63,6 +63,12 @@ const routes = [
     meta: { requiresAuth: true, layout: 'admin' },
   },
   {
+    path: '/announcements/:id',
+    name: 'AnnouncementDetail',
+    component: () => import('@/views/announcement/Detail.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/announcements/create',
     name: 'AnnouncementCreate',
     component: () => import('@/views/announcement/Create.vue'),
@@ -103,6 +109,24 @@ const routes = [
     name: 'ParticipantIndex',
     component: () => import('@/views/participant/Index.vue'),
     meta: { requiresAuth: true, layout: 'admin' },
+  },
+  {
+    path: '/participants/:id',
+    name: 'ParticipantDetail',
+    component: () => import('@/views/participant/Detail.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/participants/create',
+    name: 'ParticipantCreate',
+    component: () => import('@/views/participant/Create.vue'),
+    meta: { requiresAuth: true, layout: 'admin', roles: ['super_admin', 'admin'] },
+  },
+  {
+    path: '/participants/:id/edit',
+    name: 'ParticipantEdit',
+    component: () => import('@/views/participant/Edit.vue'),
+    meta: { requiresAuth: true, layout: 'admin', roles: ['super_admin', 'admin'] },
   },
 ]
 

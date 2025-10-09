@@ -32,7 +32,7 @@ const pageTitle = computed(() => {
     '/announcements': 'Pengumuman',
     '/users': 'Kelola Pengguna',
     '/rooms': 'Kelola Ruangan',
-    '/participants': 'Kelola Partisipan',
+    '/participants': 'Kelola Partisipan Luar',
   }
   return titles[route.path] || 'BPS Admin'
 })

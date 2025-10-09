@@ -1,0 +1,354 @@
+<template>
+  <AdminLayout>
+    <div class="page-header">
+      <h2 class="page-title">Detail Pengumuman</h2>
+      <router-link to="/announcements" class="btn btn-secondary">← Kembali</router-link>
+    </div>
+
+    <!-- Loading -->
+    <LoadingSpinner v-if="loading" text="Memuat detail pengumuman..." />
+
+    <!-- Error State -->
+    <div v-else-if="error" class="error-state">
+      <p>{{ error }}</p>
+      <router-link to="/announcements" class="btn btn-primary">Kembali ke Daftar</router-link>
+    </div>
+
+    <!-- Content -->
+    <div v-else-if="announcement" class="detail-card">
+      <!-- Header -->
+      <div class="detail-header">
+        <h1 class="title">{{ announcement.title }}</h1>
+        <div class="meta">
+          <span>📅 {{ formatDateTime(announcement.created_at) }}</span>
+          <span>👤 {{ announcement.creator?.name || 'Unknown' }}</span>
+          <span :class="announcement.is_displayed ? 'badge-active' : 'badge-inactive'">
+            {{ announcement.is_displayed ? '✅ Ditampilkan' : '❌ Tidak Ditampilkan' }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div class="detail-content" ql-editor>
+        <div v-html="announcement.content"></div>
+      </div>
+
+      <!-- Attachments -->
+      <div
+        v-if="announcement.attachments && announcement.attachments.length > 0"
+        class="attachments"
+      >
+        <h3>📎 Lampiran</h3>
+        <ul class="attachment-list">
+          <li v-for="att in announcement.attachments" :key="att.id">
+            <a
+              :href="`${baseURL.replace('/api', '')}/storage/${att.file_path}`"
+              target="_blank"
+              class="attachment-link"
+            >
+              {{ getFileIcon(att.file_type) }} {{ att.file_name }}
+              <span class="file-size">({{ formatFileSize(att.file_size) }})</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions" v-if="canEdit">
+        <router-link :to="`/announcements/${announcement.id}/edit`" class="btn btn-edit">
+          ✏️ Edit
+        </router-link>
+        <button @click="handleDelete" class="btn btn-delete">🗑️ Hapus</button>
+      </div>
+    </div>
+  </AdminLayout>
+</template>
+
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import AdminLayout from '@/layouts/AdminLayout.vue'
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import { useAuthStore } from '@/stores/auth'
+import { useNotificationStore } from '@/stores/notification'
+import announcementService from '@/services/announcementService'
+import { formatDateTime, handleError } from '@/utils/helpers'
+import '@vueup/vue-quill/dist/vue-quill.snow.css'
+
+const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
+const notificationStore = useNotificationStore()
+
+const loading = ref(true)
+const error = ref(null)
+const announcement = ref(null)
+const baseURL = import.meta.env.VITE_API_BASE_URL
+
+const canEdit = computed(() => authStore.hasRole('super_admin') || authStore.hasRole('admin'))
+
+onMounted(async () => {
+  try {
+    const id = route.params.id
+    console.log('🔍 Loading announcement ID:', id)
+
+    if (!id) {
+      throw new Error('ID pengumuman tidak ditemukan')
+    }
+
+    const data = await announcementService.getById(id)
+    console.log('✅ Data loaded:', data)
+
+    announcement.value = data
+  } catch (err) {
+    console.error('❌ Error loading announcement:', err)
+    error.value = err.response?.data?.message || err.message || 'Gagal memuat data pengumuman'
+    notificationStore.error(error.value)
+  } finally {
+    loading.value = false
+  }
+})
+
+const formatFileSize = (bytes) => {
+  if (!bytes) return '0 B'
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1048576).toFixed(1) + ' MB'
+}
+
+const getFileIcon = (mimeType) => {
+  if (!mimeType) return '📎'
+  if (mimeType.includes('pdf')) return '📄'
+  if (mimeType.includes('image')) return '🖼️'
+  if (mimeType.includes('word') || mimeType.includes('document')) return '📝'
+  return '📎'
+}
+
+const handleDelete = async () => {
+  if (!confirm('Yakin hapus pengumuman ini?')) return
+
+  try {
+    await announcementService.delete(announcement.value.id)
+    notificationStore.success('Pengumuman berhasil dihapus ✅')
+    router.push('/announcements')
+  } catch (err) {
+    notificationStore.error(handleError(err))
+  }
+}
+</script>
+
+<style scoped>
+.detail-content :deep(pre) {
+  background: #f5f5f5;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.detail-content :deep(blockquote) {
+  border-left: 4px solid #ddd;
+  padding-left: 16px;
+  margin: 16px 0;
+  color: #666;
+  font-style: italic;
+}
+
+.detail-content :deep(code) {
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+}
+
+.detail-content :deep(ul),
+.detail-content :deep(ol) {
+  padding-left: 24px;
+  margin: 12px 0;
+}
+
+.detail-content :deep(h1),
+.detail-content :deep(h2),
+.detail-content :deep(h3) {
+  margin-top: 20px;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.error-state {
+  background: #ffebee;
+  color: #c62828;
+  padding: 24px;
+  border-radius: 12px;
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.error-state p {
+  margin-bottom: 16px;
+  font-size: 16px;
+}
+
+.detail-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 32px;
+  margin-top: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.detail-header {
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 12px;
+}
+
+.meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: #666;
+}
+
+.badge-active {
+  background: #4caf50;
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+}
+
+.badge-inactive {
+  background: #ccc;
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+}
+
+.detail-content {
+  font-size: 16px;
+  line-height: 1.8;
+  color: #333;
+  margin-bottom: 32px;
+  min-height: 100px;
+}
+
+.detail-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.detail-content :deep(p) {
+  margin-bottom: 12px;
+}
+
+.attachments {
+  background: #f9f9f9;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.attachments h3 {
+  font-size: 18px;
+  margin-bottom: 12px;
+  color: #444;
+}
+
+.attachment-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.attachment-list li {
+  margin-bottom: 8px;
+}
+
+.attachment-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #1976d2;
+  text-decoration: none;
+  font-size: 14px;
+  transition: 0.2s;
+}
+
+.attachment-link:hover {
+  color: #125ea8;
+  text-decoration: underline;
+}
+
+.file-size {
+  color: #999;
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  font-size: 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  border: none;
+  transition: 0.2s;
+}
+
+.btn-primary {
+  background-color: #1976d2;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background-color: #125ea8;
+}
+
+.btn-edit {
+  background-color: #fff3e0;
+  color: #f57c00;
+}
+
+.btn-edit:hover {
+  background-color: #ffe0b2;
+}
+
+.btn-delete {
+  background-color: #ffebee;
+  color: #d32f2f;
+}
+
+.btn-delete:hover {
+  background-color: #ffcdd2;
+}
+
+.btn-secondary {
+  background-color: #f1f1f1;
+  color: #444;
+}
+
+.btn-secondary:hover {
+  background-color: #e1e1e1;
+}
+</style>

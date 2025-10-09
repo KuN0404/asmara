@@ -14,7 +14,6 @@ class Announcement extends Model
     protected $fillable = [
         'title',
         'content',
-        'media',
         'is_displayed',
         'created_by',
     ];
