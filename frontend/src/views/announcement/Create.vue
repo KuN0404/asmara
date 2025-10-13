@@ -95,7 +95,7 @@ const form = ref({
   title: '',
   content: '',
   attachments: [],
-  is_displayed: false,
+  is_displayed: true,
 })
 
 /** 📎 Upload banyak lampiran */

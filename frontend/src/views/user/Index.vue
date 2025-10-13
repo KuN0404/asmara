@@ -2,60 +2,81 @@
   <AdminLayout>
     <!-- Header -->
     <div class="page-header">
-      <h2 class="page-title">Pengumuman</h2>
-      <router-link to="/announcements/create" class="btn btn-primary" v-if="canCreate">
-        ➕ Tambah Pengumuman
+      <h2 class="page-title">Ruangan</h2>
+      <router-link to="/users/create" class="btn btn-primary" v-if="canCreate">
+        ➕ Tambah Ruangan
       </router-link>
     </div>
 
-    <div class="anouncement-table-container">
+    <div class="user-table-container">
+      <div class="filter-container">
+        <label>Status:</label>
+        <select v-model="statusFilter" @change="loadUsers">
+          <option value="active">Aktif</option>
+          <option value="inactive">Nonaktif</option>
+          <option value="all">Semua</option>
+        </select>
+      </div>
+
       <!-- Loader -->
       <LoadingSpinner v-if="loading" text="Memuat pengumuman..." />
 
       <!-- Table Card -->
       <div v-else class="table-card">
-        <table class="anouncement-table">
+        <table class="user-table">
           <thead>
             <tr>
               <th>No</th>
-              <th>Judul</th>
-              <th>Dibuat Oleh</th>
-              <th>Dibuat Pada</th>
+              <th>Nama</th>
+              <th>No Hp</th>
+              <th>Status</th>
               <th>Aksi</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(announcement, index) in announcements" :key="announcement.id">
+            <tr v-for="(user, index) in users" :key="user.id">
               <td>{{ (filters.page - 1) * filters.per_page + index + 1 }}</td>
-              <td>{{ announcement.title }}</td>
-              <td>{{ announcement.creator?.name || 'Tidak diketahui' }}</td>
-              <td>{{ formatDateTime(announcement.created_at) }}</td>
+              <td>{{ user.name }}</td>
+              <td>{{ user.whatsapp_number || '-' }}</td>
+              <td>
+                <span :class="user.deleted_at ? 'badge-inactive' : 'badge-active'">
+                  {{ user.deleted_at ? 'Nonaktif' : 'Aktif' }}
+                </span>
+              </td>
               <td>
                 <div class="action-buttons">
-                  <router-link :to="`/announcements/${announcement.id}`" class="btn-sm btn-info">
+                  <router-link :to="`/users/${user.id}`" class="btn-sm btn-info">
                     👁️ Detail
                   </router-link>
                   <router-link
-                    :to="`/announcements/${announcement.id}/edit`"
+                    :to="`/users/${user.id}/edit`"
                     class="btn-sm btn-edit"
                     v-if="canEdit"
                   >
                     ✏️ Ubah
                   </router-link>
+                  <!-- Soft Delete / Restore -->
                   <button
-                    @click="deleteAnnouncement(announcement)"
+                    v-if="!user.deleted_at && canDelete"
+                    @click="deleteUser(user)"
                     class="btn-sm btn-delete"
-                    v-if="canDelete"
                   >
-                    🗑️ Hapus
+                    🗑️ Nonaktifkan
+                  </button>
+                  <button
+                    v-else-if="user.deleted_at && canEdit"
+                    @click="restoreUser(user)"
+                    class="btn-sm btn-restore"
+                  >
+                    🔄 Aktifkan
                   </button>
                 </div>
               </td>
             </tr>
 
             <!-- State kosong -->
-            <tr v-if="announcements.length === 0">
-              <td colspan="6" class="empty-state">Tidak ada pemberitahuan</td>
+            <tr v-if="users.length === 0">
+              <td colspan="6" class="empty-state">Tidak ada ruangan</td>
             </tr>
           </tbody>
         </table>
@@ -74,8 +95,8 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
-import announcementService from '@/services/announcementService'
-import { formatDateTime, handleError } from '@/utils/helpers'
+import userService from '@/services/userService.js'
+import { handleError } from '@/utils/helpers'
 
 // Store
 const authStore = useAuthStore()
@@ -83,7 +104,8 @@ const notificationStore = useNotificationStore()
 
 // State
 const loading = ref(true)
-const announcements = ref([])
+const users = ref([])
+const statusFilter = ref('active') // default: aktif
 const pagination = ref(null)
 const filters = ref({
   page: 1,
@@ -96,11 +118,22 @@ const canEdit = computed(() => canCreate.value)
 const canDelete = computed(() => canCreate.value)
 
 // Ambil data
-const loadAnnouncements = async () => {
+const loadUsers = async () => {
   loading.value = true
   try {
-    const response = await announcementService.getAll(filters.value)
-    announcements.value = response.data
+    const params = { ...filters.value }
+
+    // Kirim filter status ke backend
+    if (statusFilter.value === 'active') {
+      params.status = 'active'
+    } else if (statusFilter.value === 'inactive') {
+      params.status = 'inactive'
+    } else {
+      params.status = 'all'
+    }
+
+    const response = await userService.getAll(params)
+    users.value = response.data
     pagination.value = {
       current_page: response.current_page,
       last_page: response.last_page,
@@ -117,15 +150,15 @@ const loadAnnouncements = async () => {
 
 const changePage = (page) => {
   filters.value.page = page
-  loadAnnouncements()
+  loadUsers()
 }
 
-const deleteAnnouncement = async (announcement) => {
-  if (!confirm(`Apakah Anda yakin ingin menghapus "${announcement.title}"?`)) return
+const deleteUser = async (user) => {
+  if (!confirm(`Apakah Anda yakin ingin menghapus "${user.name}"?`)) return
   try {
-    await announcementService.delete(announcement.id)
-    notificationStore.success('Pengumuman berhasil dihapus')
-    loadAnnouncements()
+    await userService.delete(user.id)
+    notificationStore.success('Ruangan berhasil dihapus')
+    loadUsers()
   } catch (error) {
     notificationStore.error(handleError(error))
   }
@@ -133,7 +166,7 @@ const deleteAnnouncement = async (announcement) => {
 
 // Lifecycle
 onMounted(() => {
-  loadAnnouncements()
+  loadUsers()
 })
 </script>
 
@@ -151,36 +184,36 @@ onMounted(() => {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
 }
 
-.anouncement-table {
+.user-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.anouncement-table thead {
+.user-table thead {
   background-color: #f8f9fa;
 }
 
-.anouncement-table th,
-.anouncement-table td {
+.user-table th,
+.user-table td {
   padding: 14px 16px;
   text-align: left;
 }
 
-.anouncement-table th {
+.user-table th {
   font-weight: 600;
   font-size: 14px;
   color: #555;
 }
 
-.anouncement-table tbody tr {
+.user-table tbody tr {
   transition: background 0.2s ease;
 }
 
-.anouncement-table tbody tr:hover {
+.user-table tbody tr:hover {
   background-color: #f5f7fa;
 }
 
-.anouncement-table tbody td {
+.user-table tbody td {
   font-size: 14px;
   color: #333;
   border-top: 1px solid #eee;
@@ -225,5 +258,21 @@ onMounted(() => {
 .btn-sm:hover {
   opacity: 0.8;
   transition: 0.2s;
+}
+
+.badge-active {
+  background: #4caf50;
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+}
+
+.badge-inactive {
+  background: #ccc;
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
 }
 </style>

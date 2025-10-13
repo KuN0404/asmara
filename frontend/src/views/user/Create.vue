@@ -1,70 +1,52 @@
 <template>
   <AdminLayout>
     <div class="page-header">
-      <h2 class="page-title">Tambah Pengumuman</h2>
-      <router-link to="/announcements" class="btn btn-secondary">← Kembali</router-link>
+      <h2 class="page-title">Tambah Ruangan</h2>
+      <router-link to="/rooms" class="btn btn-secondary">
+        <ArrowLeft :size="18" /> Kembali
+      </router-link>
     </div>
 
     <div class="form-container">
       <form @submit.prevent="handleSubmit">
-        <!-- Judul -->
         <div class="form-group">
-          <label class="form-label">Judul Pengumuman *</label>
+          <label class="form-label">Nama *</label>
           <input
             type="text"
             class="form-input"
-            v-model="form.title"
-            placeholder="Masukkan judul pengumuman"
+            v-model="form.name"
+            placeholder="Masukkan nama ruangan"
             required
           />
         </div>
 
-        <!-- Editor Quill -->
         <div class="form-group">
-          <label class="form-label">Isi Pengumuman *</label>
-          <QuillEditor
-            v-model:content="form.content"
-            @update:content="(val) => (form.content = val)"
-            content-type="html"
-            theme="snow"
-            toolbar="full"
-            class="quill-editor"
-          />
-        </div>
-
-        <!-- Multiple attachments -->
-        <div class="form-group">
-          <label class="form-label">Lampiran (optional)</label>
+          <label class="form-label">Lokasi *</label>
           <input
-            type="file"
+            type="text"
             class="form-input"
-            multiple
-            @change="handleAttachmentsUpload"
-            accept=".jpg,.jpeg,.png,.pdf,.doc,.docx"
+            v-model="form.location"
+            placeholder="Masukkan lokasi ruangan"
+            required
           />
-          <ul v-if="attachmentNames.length" class="attachment-list">
-            <li v-for="(name, index) in attachmentNames" :key="index">
-              📎 {{ name }}
-              <button type="button" class="remove-file-btn" @click="removeAttachment(index)">
-                ❌
-              </button>
-            </li>
-          </ul>
         </div>
 
-        <!-- Checkbox tampilkan -->
         <div class="form-group">
-          <label class="checkbox-label">
-            <input type="checkbox" v-model="form.is_displayed" class="checkbox-input" />
-            <span>Tampilkan ke pengguna lain</span>
-          </label>
+          <label class="form-label">Kapasitas</label>
+          <input
+            type="text"
+            class="form-input"
+            v-model="form.capacity"
+            placeholder="Masukkan kapasitas ruangan"
+            required
+          />
         </div>
 
-        <!-- Actions -->
         <div class="form-actions">
-          <router-link to="/announcements" class="btn btn-secondary">Batal</router-link>
+          <router-link to="/rooms" class="btn btn-secondary">Batal</router-link>
           <button type="submit" class="btn btn-primary" :disabled="loading">
-            <span v-if="!loading">💾 Simpan</span>
+            <Save :size="18" v-if="!loading" />
+            <span v-if="!loading">Simpan</span>
             <span v-else>Menyimpan...</span>
           </button>
         </div>
@@ -76,63 +58,34 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ArrowLeft, Save } from 'lucide-vue-next'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { useNotificationStore } from '@/stores/notification'
-import announcementService from '@/services/announcementService'
+import roomService from '@/services/roomService'
 import { handleError } from '@/utils/helpers'
-
-// 🪄 Import Quill Editor
-import { QuillEditor } from '@vueup/vue-quill'
-import '@vueup/vue-quill/dist/vue-quill.snow.css'
 
 const router = useRouter()
 const notificationStore = useNotificationStore()
 
 const loading = ref(false)
-const attachmentNames = ref([])
-
 const form = ref({
-  title: '',
-  content: '',
-  attachments: [],
-  is_displayed: false,
+  name: '',
+  location: '',
+  capacity: '',
+  is_available: true,
 })
 
-/** 📎 Upload banyak lampiran */
-const handleAttachmentsUpload = (e) => {
-  const files = Array.from(e.target.files)
-  if (files.length > 0) {
-    form.value.attachments.push(...files)
-    attachmentNames.value.push(...files.map((f) => f.name))
-  }
-}
-
-/** 🗑️ Hapus file tertentu */
-const removeAttachment = (index) => {
-  form.value.attachments.splice(index, 1)
-  attachmentNames.value.splice(index, 1)
-}
-
 const handleSubmit = async () => {
-  if (!form.value.title.trim() || !form.value.content || form.value.content === '<p><br></p>') {
-    notificationStore.error('Judul dan isi wajib diisi ❌')
+  if (!form.value.name.trim()) {
+    notificationStore.error('Nama ruangan wajib diisi')
     return
   }
 
-  const formData = new FormData()
-  formData.append('title', form.value.title)
-  formData.append('content', form.value.content)
-  formData.append('is_displayed', form.value.is_displayed ? '1' : '0')
-
-  form.value.attachments.forEach((file) => {
-    formData.append('attachments[]', file)
-  })
-
   loading.value = true
   try {
-    await announcementService.create(formData) // ✅ Kirim FormData langsung
-    notificationStore.success('Pengumuman berhasil ditambahkan ✅')
-    router.push('/announcements')
+    await roomService.create(form.value)
+    notificationStore.success('Ruangan berhasil ditambahkan')
+    router.push('/rooms')
   } catch (error) {
     notificationStore.error(handleError(error))
   } finally {
@@ -148,7 +101,7 @@ const handleSubmit = async () => {
   padding: 24px;
   margin-top: 1rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  max-width: 750px;
+  max-width: 600px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -172,51 +125,9 @@ const handleSubmit = async () => {
   font-size: 14px;
 }
 
-/* 🧭 Atur Quill Editor */
-.quill-editor .ql-container {
-  min-height: 300px;
-}
-.quill-editor .ql-editor {
-  min-height: 300px;
-  padding-bottom: 50px;
-}
-.quill-editor {
-  position: relative;
-  z-index: 1;
-}
-
-.attachment-list {
-  list-style: none;
-  padding-left: 0;
-}
-
-.attachment-list li {
-  margin-top: 6px;
-  font-size: 13px;
-  color: #555;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.remove-file-btn {
-  background: transparent;
-  border: none;
-  color: red;
-  font-size: 14px;
-  cursor: pointer;
-  margin-left: 8px;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.checkbox-input {
-  width: 20px;
-  height: 20px;
+.form-input:focus {
+  outline: none;
+  border-color: #1976d2;
 }
 
 .form-actions {
@@ -229,7 +140,7 @@ const handleSubmit = async () => {
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   padding: 10px 18px;
   font-size: 14px;
   border-radius: 8px;
@@ -255,5 +166,10 @@ const handleSubmit = async () => {
 
 .btn-secondary:hover {
   background-color: #e1e1e1;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

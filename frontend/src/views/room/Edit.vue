@@ -1,82 +1,50 @@
 <template>
   <AdminLayout>
     <div class="page-header">
-      <h2 class="page-title">Edit Pengumuman</h2>
-      <router-link to="/announcements" class="btn btn-secondary">← Kembali</router-link>
+      <h2 class="page-title">Edit Ruangan</h2>
+      <router-link to="/rooms" class="btn btn-secondary">← Kembali</router-link>
     </div>
 
     <LoadingSpinner v-if="loadingData" text="Memuat data..." />
 
-    <div v-else-if="announcement" class="form-container">
+    <div v-else-if="room" class="form-container">
       <form @submit.prevent="handleSubmit">
         <!-- Judul -->
         <div class="form-group">
-          <label class="form-label">Judul Pengumuman *</label>
+          <label class="form-label">Nama Ruangan *</label>
           <input
             type="text"
             class="form-input"
-            v-model="form.title"
-            placeholder="Masukkan judul pengumuman"
+            v-model="form.name"
+            placeholder="Masukkan nama ruangan"
             required
           />
         </div>
 
-        <!-- Editor Quill -->
         <div class="form-group">
-          <label class="form-label">Isi Pengumuman *</label>
-          <QuillEditor
-            v-model:content="form.content"
-            content-type="html"
-            theme="snow"
-            toolbar="full"
-            class="quill-editor"
-          />
-        </div>
-
-        <!-- Lampiran Lama -->
-        <div v-if="existingAttachments.length" class="form-group">
-          <label class="form-label">Lampiran Saat Ini</label>
-          <ul class="existing-attachment-list">
-            <li v-for="att in existingAttachments" :key="att.id">
-              <a :href="`http://localhost:8000/storage/${att.file_path}`" target="_blank">
-                📎 {{ att.file_name }}
-              </a>
-              <button type="button" class="remove-btn" @click="removeExisting(att.id)">❌</button>
-            </li>
-          </ul>
-        </div>
-
-        <!-- Lampiran Baru -->
-        <div class="form-group">
-          <label class="form-label">Tambah Lampiran Baru (optional)</label>
+          <label class="form-label">Lokasi</label>
           <input
-            type="file"
+            type="text"
             class="form-input"
-            multiple
-            @change="handleAttachmentsUpload"
-            accept=".jpg,.jpeg,.png,.pdf,.doc,.docx"
+            v-model="form.location"
+            placeholder="Masukkan lokasi ruangan"
+            required
           />
-          <ul v-if="newAttachmentNames.length" class="attachment-list">
-            <li v-for="(name, index) in newAttachmentNames" :key="index">
-              📎 {{ name }}
-              <button type="button" class="remove-file-btn" @click="removeNewAttachment(index)">
-                ❌
-              </button>
-            </li>
-          </ul>
         </div>
 
-        <!-- Checkbox tampilkan -->
         <div class="form-group">
-          <label class="checkbox-label">
-            <input type="checkbox" v-model="form.is_displayed" class="checkbox-input" />
-            <span>Tampilkan ke pengguna lain</span>
-          </label>
+          <label class="form-label">Kapasitas Ruangan</label>
+          <input
+            type="text"
+            class="form-input"
+            v-model="form.capacity"
+            placeholder="Masukkan kapasitas ruangan"
+          />
         </div>
 
         <!-- Actions -->
         <div class="form-actions">
-          <router-link to="/announcements" class="btn btn-secondary">Batal</router-link>
+          <router-link to="/rooms" class="btn btn-secondary">Batal</router-link>
           <button type="submit" class="btn btn-primary" :disabled="loading">
             <span v-if="!loading">💾 Simpan Perubahan</span>
             <span v-else>Menyimpan...</span>
@@ -93,9 +61,8 @@ import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { useNotificationStore } from '@/stores/notification'
-import announcementService from '@/services/announcementService'
+import roomService from '@/services/roomService'
 import { handleError } from '@/utils/helpers'
-import { QuillEditor } from '@vueup/vue-quill'
 import '@vueup/vue-quill/dist/vue-quill.snow.css'
 
 const route = useRoute()
@@ -104,86 +71,51 @@ const notificationStore = useNotificationStore()
 
 const loadingData = ref(true)
 const loading = ref(false)
-const announcement = ref(null)
-const existingAttachments = ref([])
-const newAttachmentNames = ref([])
-const removedAttachmentIds = ref([])
+const room = ref(null)
 
 const form = ref({
-  title: '',
-  content: '',
-  attachments: [],
-  is_displayed: false,
+  name: '',
+  location: '',
+  capacity: '',
+  is_available: true,
 })
 
 onMounted(async () => {
   try {
-    const data = await announcementService.getById(route.params.id)
-    announcement.value = data
+    const data = await roomService.getById(route.params.id)
+    room.value = data
 
-    form.value.title = data.title
-    form.value.content = data.content
-    form.value.is_displayed = data.is_displayed
-    existingAttachments.value = data.attachments || []
+    form.value.name = data.name
+    form.value.location = data.location
+    form.value.capacity = data.capacity
   } catch (error) {
     notificationStore.error(handleError(error))
-    router.push('/announcements')
+    router.push('/rooms')
   } finally {
     loadingData.value = false
   }
 })
 
-const handleAttachmentsUpload = (e) => {
-  const files = Array.from(e.target.files)
-  if (files.length > 0) {
-    form.value.attachments.push(...files)
-    newAttachmentNames.value.push(...files.map((f) => f.name))
-  }
-}
-
-const removeNewAttachment = (index) => {
-  form.value.attachments.splice(index, 1)
-  newAttachmentNames.value.splice(index, 1)
-}
-
-const removeExisting = (attId) => {
-  if (!confirm('Hapus lampiran ini?')) return
-  existingAttachments.value = existingAttachments.value.filter((a) => a.id !== attId)
-  removedAttachmentIds.value.push(attId)
-}
-
 const handleSubmit = async () => {
-  if (!form.value.title.trim()) {
-    notificationStore.error('Judul pengumuman wajib diisi ❌')
+  if (!form.value.name.trim()) {
+    notificationStore.error('Nama ruangan wajib diisi')
     return
   }
 
-  if (!form.value.content || form.value.content === '<p><br></p>') {
-    notificationStore.error('Isi pengumuman wajib diisi ❌')
+  if (!form.value.location.trim()) {
+    notificationStore.error('Lokasi ruangan wajib diisi')
     return
   }
 
   const formData = new FormData()
-  formData.append('title', form.value.title)
-  formData.append('content', form.value.content)
-  formData.append('is_displayed', form.value.is_displayed ? '1' : '0')
-
-  // Lampiran baru
-  form.value.attachments.forEach((file) => {
-    formData.append('attachments[]', file)
-  })
-
-  // ID lampiran yang tetap (tidak dihapus)
-  const keepAttachmentIds = existingAttachments.value.map((a) => a.id)
-  keepAttachmentIds.forEach((id) => {
-    formData.append('keep_attachment_ids[]', id)
-  })
-
+  formData.append('name', form.value.name)
+  formData.append('location', form.value.location)
+  formData.append('capacity', form.value.capacity || '')
   loading.value = true
   try {
-    await announcementService.update(route.params.id, formData)
-    notificationStore.success('Pengumuman berhasil diperbarui ✅')
-    router.push('/announcements')
+    await roomService.update(route.params.id, formData)
+    notificationStore.success('Ruangan berhasil diperbarui ✅')
+    router.push('/rooms')
   } catch (error) {
     console.error('❌ Error update:', error)
     notificationStore.error(handleError(error))

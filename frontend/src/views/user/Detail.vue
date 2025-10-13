@@ -1,8 +1,8 @@
 <template>
   <AdminLayout>
     <div class="page-header">
-      <h2 class="page-title">Detail Pengumuman</h2>
-      <router-link to="/announcements" class="btn btn-secondary">← Kembali</router-link>
+      <h2 class="page-title">Detail Ruangan</h2>
+      <router-link to="/rooms" class="btn btn-secondary">← Kembali</router-link>
     </div>
 
     <!-- Loading -->
@@ -11,53 +11,25 @@
     <!-- Error State -->
     <div v-else-if="error" class="error-state">
       <p>{{ error }}</p>
-      <router-link to="/announcements" class="btn btn-primary">Kembali ke Daftar</router-link>
+      <router-link to="/rooms" class="btn btn-primary">Kembali ke Daftar</router-link>
     </div>
 
     <!-- Content -->
-    <div v-else-if="announcement" class="detail-card">
+    <div v-else-if="room" class="detail-card">
       <!-- Header -->
       <div class="detail-header">
-        <h1 class="title">{{ announcement.title }}</h1>
+        <h1 class="title">{{ room.name }}</h1>
         <div class="meta">
-          <span>📅 {{ formatDateTime(announcement.created_at) }}</span>
-          <span>👤 {{ announcement.creator?.name || 'Unknown' }}</span>
-          <span :class="announcement.is_displayed ? 'badge-active' : 'badge-inactive'">
-            {{ announcement.is_displayed ? '✅ Ditampilkan' : '❌ Tidak Ditampilkan' }}
+          <span>👤 {{ room?.location || 'Tidak dicantumkan' }}</span>
+          <span>👤 {{ room?.capacity || 'Tidak dicantumkan' }}</span>
+          <span :class="room.is_available ? 'badge-active' : 'badge-inactive'">
+            {{ room.is_available ? 'Tersedia' : 'Tidak Tersedia' }}
           </span>
         </div>
       </div>
-
-      <!-- Content -->
-      <div class="detail-content" ql-editor>
-        <div v-html="announcement.content"></div>
-      </div>
-
-      <!-- Attachments -->
-      <div
-        v-if="announcement.attachments && announcement.attachments.length > 0"
-        class="attachments"
-      >
-        <h3>📎 Lampiran</h3>
-        <ul class="attachment-list">
-          <li v-for="att in announcement.attachments" :key="att.id">
-            <a
-              :href="`${baseURL.replace('/api', '')}/storage/${att.file_path}`"
-              target="_blank"
-              class="attachment-link"
-            >
-              {{ getFileIcon(att.file_type) }} {{ att.file_name }}
-              <span class="file-size">({{ formatFileSize(att.file_size) }})</span>
-            </a>
-          </li>
-        </ul>
-      </div>
-
       <!-- Actions -->
       <div class="actions" v-if="canEdit">
-        <router-link :to="`/announcements/${announcement.id}/edit`" class="btn btn-edit">
-          ✏️ Edit
-        </router-link>
+        <router-link :to="`/rooms/${room.id}/edit`" class="btn btn-edit"> ✏️ Edit </router-link>
         <button @click="handleDelete" class="btn btn-delete">🗑️ Hapus</button>
       </div>
     </div>
@@ -71,7 +43,7 @@ import AdminLayout from '@/layouts/AdminLayout.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
-import announcementService from '@/services/announcementService'
+import roomService from '@/services/roomService'
 import { formatDateTime, handleError } from '@/utils/helpers'
 import '@vueup/vue-quill/dist/vue-quill.snow.css'
 
@@ -82,7 +54,7 @@ const notificationStore = useNotificationStore()
 
 const loading = ref(true)
 const error = ref(null)
-const announcement = ref(null)
+const room = ref(null)
 const baseURL = import.meta.env.VITE_API_BASE_URL
 
 const canEdit = computed(() => authStore.hasRole('super_admin') || authStore.hasRole('admin'))
@@ -90,18 +62,18 @@ const canEdit = computed(() => authStore.hasRole('super_admin') || authStore.has
 onMounted(async () => {
   try {
     const id = route.params.id
-    console.log('🔍 Loading announcement ID:', id)
+    console.log('🔍 Loading room ID:', id)
 
     if (!id) {
       throw new Error('ID pengumuman tidak ditemukan')
     }
 
-    const data = await announcementService.getById(id)
+    const data = await roomService.getById(id)
     console.log('✅ Data loaded:', data)
 
-    announcement.value = data
+    room.value = data
   } catch (err) {
-    console.error('❌ Error loading announcement:', err)
+    console.error('❌ Error loading room:', err)
     error.value = err.response?.data?.message || err.message || 'Gagal memuat data pengumuman'
     notificationStore.error(error.value)
   } finally {
@@ -128,9 +100,9 @@ const handleDelete = async () => {
   if (!confirm('Yakin hapus pengumuman ini?')) return
 
   try {
-    await announcementService.delete(announcement.value.id)
-    notificationStore.success('Pengumuman berhasil dihapus ✅')
-    router.push('/announcements')
+    await roomService.delete(room.value.id)
+    notificationStore.success('Ruangan berhasil dihapus ✅')
+    router.push('/rooms')
   } catch (err) {
     notificationStore.error(handleError(err))
   }
@@ -197,8 +169,6 @@ const handleDelete = async () => {
 }
 
 .detail-header {
-  border-bottom: 2px solid #f0f0f0;
-  padding-bottom: 20px;
   margin-bottom: 24px;
 }
 

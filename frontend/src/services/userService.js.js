@@ -49,4 +49,10 @@ export default {
     const response = await api.delete(`/users/${id}`)
     return response.data
   },
+
+  // userService.js
+  async restore(id) {
+    const response = await api.post(`/users/${id}/restore`)
+    return response.data
+  },
 }

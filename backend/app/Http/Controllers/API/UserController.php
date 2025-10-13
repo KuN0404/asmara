@@ -10,16 +10,37 @@ use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
-    public function index(Request $request)
-    {
-        $users = User::with('roles')
-            ->when($request->role, function ($q) use ($request) {
-                $q->role($request->role);
-            })
-            ->paginate($request->per_page ?? 15);
+    // public function index(Request $request)
+    // {
+    //     $users = User::with('roles')
+    //         ->when($request->role, function ($q) use ($request) {
+    //             $q->role($request->role);
+    //         })
+    //         ->paginate($request->per_page ?? 15);
 
-        return response()->json($users);
-    }
+    //     return response()->json($users);
+    // }
+
+    public function index(Request $request)
+{
+    $users = User::with('roles')
+        ->when($request->role, function ($q) use ($request) {
+            $q->role($request->role);
+        })
+        ->when($request->status, function ($q) use ($request) {
+            if ($request->status === 'active') {
+                $q->whereNull('deleted_at');
+            } elseif ($request->status === 'inactive') {
+                $q->onlyTrashed();
+            } elseif ($request->status === 'all') {
+                $q->withTrashed();
+            }
+        })
+        ->paginate($request->per_page ?? 15);
+
+    return response()->json($users);
+}
+
 
     public function store(Request $request)
     {
@@ -96,4 +117,11 @@ class UserController extends Controller
             'message' => 'Pengguna berhasil dihapus',
         ]);
     }
+
+    public function restore($id) {
+        $user = User::withTrashed()->findOrFail($id);
+        $user->restore();
+        return response()->json(['message' => 'Pengguna berhasil diaktifkan']);
+    }
+
 }

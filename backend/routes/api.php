@@ -18,9 +18,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
-    // Users - Only Super Admin & Admin
-    Route::middleware('role:super_admin,admin')->group(function () {
+    // Users - Only Super Admin
+    Route::middleware('role:super_admin')->group(function () {
         Route::apiResource('users', UserController::class);
+        Route::post('users', [RoomController::class, 'store']);
+        Route::put('users/{id}', [RoomController::class, 'update']);
+        Route::delete('users/{id}', [RoomController::class, 'destroy']);
+        Route::post('/users/{id}/restore', [UserController::class, 'restore']);
+
     });
 
     // Rooms - All authenticated users can view, Super Admin & Admin can manage
