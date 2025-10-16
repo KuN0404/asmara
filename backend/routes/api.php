@@ -19,11 +19,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
 
     // Users - Only Super Admin
-    Route::middleware('role:super_admin')->group(function () {
+    Route::middleware('role:super_admin,admin')->group(function () {
         Route::apiResource('users', UserController::class);
-        Route::post('users', [RoomController::class, 'store']);
-        Route::put('users/{id}', [RoomController::class, 'update']);
-        Route::delete('users/{id}', [RoomController::class, 'destroy']);
+        Route::post('users', [UserController::class, 'store']);
+        Route::put('users/{id}', [UserController::class, 'update']);
+        Route::delete('users/{id}', [UserController::class, 'destroy']);
         Route::post('/users/{id}/restore', [UserController::class, 'restore']);
 
     });

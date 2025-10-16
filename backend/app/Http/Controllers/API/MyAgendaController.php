@@ -8,16 +8,17 @@ use Illuminate\Http\Request;
 
 class MyAgendaController extends Controller
 {
-    public function index(Request $request)
-    {
-        $agendas = MyAgenda::with('creator')
-            ->where('ceated_by', $request->user()->id)
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->orderBy('start_at', 'desc')
-            ->paginate($request->per_page ?? 15);
+public function index(Request $request)
+{
+    $agendas = MyAgenda::with('creator')
+        ->withTrashed() // TAMBAHKAN INI
+        ->where('created_by', $request->user()->id)
+        ->when($request->status, fn($q) => $q->where('status', $request->status))
+        ->orderBy('start_at', 'desc')
+        ->paginate($request->per_page ?? 15);
 
-        return response()->json($agendas);
-    }
+    return response()->json($agendas);
+}
 
     public function store(Request $request)
     {
@@ -30,7 +31,7 @@ class MyAgendaController extends Controller
             'status' => 'required|in:comming_soon,in_progress,schedule_change,completed,cancelled',
         ]);
 
-        $validated['ceated_by'] = $request->user()->id;
+        $validated['created_by'] = $request->user()->id; // FIXED
 
         $agenda = MyAgenda::create($validated);
 
@@ -40,39 +41,42 @@ class MyAgendaController extends Controller
         ], 201);
     }
 
-    public function show($id)
-    {
-        $agenda = MyAgenda::with('creator')
-            ->where('ceated_by', auth()->id())
-            ->findOrFail($id);
+public function show($id)
+{
+    $agenda = MyAgenda::with('creator')
+        ->withTrashed() // TAMBAHKAN INI
+        ->where('created_by', auth()->id())
+        ->findOrFail($id);
 
-        return response()->json($agenda);
-    }
+    return response()->json($agenda);
+}
 
-    public function update(Request $request, $id)
-    {
-        $agenda = MyAgenda::where('ceated_by', $request->user()->id)->findOrFail($id);
+public function update(Request $request, $id)
+{
+    $agenda = MyAgenda::withTrashed() // TAMBAHKAN INI
+        ->where('created_by', $request->user()->id)
+        ->findOrFail($id);
 
-        $validated = $request->validate([
-            'start_at' => 'sometimes|date',
-            'until_at' => 'sometimes|date|after:start_at',
-            'title' => 'sometimes|string',
-            'description' => 'nullable|string',
-            'is_show_to_other' => 'sometimes|boolean',
-            'status' => 'sometimes|in:comming_soon,in_progress,schedule_change,completed,cancelled',
-        ]);
+    $validated = $request->validate([
+        'start_at' => 'sometimes|date',
+        'until_at' => 'sometimes|date|after:start_at',
+        'title' => 'sometimes|string',
+        'description' => 'nullable|string',
+        'is_show_to_other' => 'sometimes|boolean',
+        'status' => 'sometimes|in:comming_soon,in_progress,schedule_change,completed,cancelled',
+    ]);
 
-        $agenda->update($validated);
+    $agenda->update($validated);
 
-        return response()->json([
-            'message' => 'Agenda berhasil diperbarui',
-            'agenda' => $agenda,
-        ]);
-    }
+    return response()->json([
+        'message' => 'Agenda berhasil diperbarui',
+        'agenda' => $agenda,
+    ]);
+}
 
     public function destroy($id)
     {
-        $agenda = MyAgenda::where('ceated_by', auth()->id())->findOrFail($id);
+        $agenda = MyAgenda::where('created_by', auth()->id())->findOrFail($id); // FIXED
         $agenda->delete();
 
         return response()->json([
@@ -80,15 +84,15 @@ class MyAgendaController extends Controller
         ]);
     }
 
-    // Get other users' public agendas
-    public function publicAgendas(Request $request)
-    {
-        $agendas = MyAgenda::with('creator')
-            ->where('is_show_to_other', true)
-            ->where('ceated_by', '!=', $request->user()->id)
-            ->orderBy('start_at', 'desc')
-            ->paginate($request->per_page ?? 15);
+public function publicAgendas(Request $request)
+{
+    $agendas = MyAgenda::with('creator')
+        ->withTrashed() // TAMBAHKAN INI
+        ->where('is_show_to_other', true)
+        ->where('created_by', '!=', $request->user()->id)
+        ->orderBy('start_at', 'desc')
+        ->paginate($request->per_page ?? 15);
 
-        return response()->json($agendas);
-    }
+    return response()->json($agendas);
+}
 }

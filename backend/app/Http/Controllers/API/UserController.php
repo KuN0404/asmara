@@ -74,39 +74,40 @@ class UserController extends Controller
         return response()->json($user);
     }
 
-    public function update(Request $request, $id)
-    {
-        $user = User::findOrFail($id);
+public function update(Request $request, $id)
+{
+    $user = User::findOrFail($id);
 
-        $validated = $request->validate([
-            'username' => 'sometimes|string|unique:users,username,' . $id,
-            'name' => 'sometimes|string',
-            'email' => 'sometimes|email|unique:users,email,' . $id,
-            'password' => 'sometimes|string|min:8',
-            'whatsapp_number' => 'sometimes|string',
-            'address' => 'nullable|string',
-            'photo' => 'nullable|image|max:2048',
-            'role' => 'sometimes|in:super_admin,admin,staff',
-        ]);
+    $validated = $request->validate([
+        'username' => 'required|string|unique:users,username,' . $id,
+        'name' => 'required|string',
+        'email' => 'required|email|unique:users,email,' . $id,
+        'whatsapp_number' => 'required|string',
+        'address' => 'nullable|string',
+        'role' => 'required|in:admin,staff',
+        'password' => 'nullable|string|min:8',
+        'photo' => 'nullable|image|max:2048',
+    ]);
 
-        if ($request->hasFile('photo')) {
-            if ($user->photo) {
-                Storage::disk('public')->delete($user->photo);
-            }
-            $validated['photo'] = $request->file('photo')->store('users', 'public');
+    if ($request->hasFile('photo')) {
+        if ($user->photo) {
+            Storage::disk('public')->delete($user->photo);
         }
-
-        $user->update($validated);
-
-        if (isset($validated['role'])) {
-            $user->syncRoles([$validated['role']]);
-        }
-
-        return response()->json([
-            'message' => 'Pengguna berhasil diperbarui',
-            'user' => $user->load('roles'),
-        ]);
+        $validated['photo'] = $request->file('photo')->store('users', 'public');
     }
+
+    $user->update($validated);
+
+    if (isset($validated['role'])) {
+        $user->syncRoles([$validated['role']]);
+    }
+
+    return response()->json([
+        'message' => 'Pengguna berhasil diperbarui',
+        'user' => $user->load('roles'),
+    ]);
+}
+
 
     public function destroy($id)
     {

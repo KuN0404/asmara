@@ -84,19 +84,19 @@ const routes = [
     path: '/users',
     name: 'UserIndex',
     component: () => import('@/views/user/Index.vue'),
-    meta: { requiresAuth: true, layout: 'admin', roles: ['super_admin'] },
+    meta: { requiresAuth: true, layout: 'admin', roles: ['super_admin', 'admin'] },
   },
   {
     path: '/users/create',
     name: 'UserCreate',
     component: () => import('@/views/user/Create.vue'),
-    meta: { requiresAuth: true, layout: 'admin', roles: ['super_admin'] },
+    meta: { requiresAuth: true, layout: 'admin', roles: ['super_admin', 'admin'] },
   },
   {
     path: '/users/:id/edit',
     name: 'UserEdit',
     component: () => import('@/views/user/Edit.vue'),
-    meta: { requiresAuth: true, layout: 'admin', roles: ['super_admin'] },
+    meta: { requiresAuth: true, layout: 'admin', roles: ['super_admin', 'admin'] },
   },
   {
     path: '/rooms',

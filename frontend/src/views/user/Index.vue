@@ -2,9 +2,9 @@
   <AdminLayout>
     <!-- Header -->
     <div class="page-header">
-      <h2 class="page-title">Ruangan</h2>
+      <h2 class="page-title">Pengguna</h2>
       <router-link to="/users/create" class="btn btn-primary" v-if="canCreate">
-        ➕ Tambah Ruangan
+        ➕ Tambah Pengguna
       </router-link>
     </div>
 
@@ -76,7 +76,7 @@
 
             <!-- State kosong -->
             <tr v-if="users.length === 0">
-              <td colspan="6" class="empty-state">Tidak ada ruangan</td>
+              <td colspan="6" class="empty-state">Tidak ada pengguna</td>
             </tr>
           </tbody>
         </table>
@@ -157,7 +157,18 @@ const deleteUser = async (user) => {
   if (!confirm(`Apakah Anda yakin ingin menghapus "${user.name}"?`)) return
   try {
     await userService.delete(user.id)
-    notificationStore.success('Ruangan berhasil dihapus')
+    notificationStore.success('Pengguna berhasil dihapus')
+    loadUsers()
+  } catch (error) {
+    notificationStore.error(handleError(error))
+  }
+}
+
+const restoreUser = async (user) => {
+  if (!confirm(`Apakah Anda yakin ingin mengaktifkan kembali "${user.name}"?`)) return
+  try {
+    await userService.restore(user.id)
+    notificationStore.success('Pengguna berhasil diaktifkan kembali')
     loadUsers()
   } catch (error) {
     notificationStore.error(handleError(error))

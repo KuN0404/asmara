@@ -17,7 +17,7 @@ class MyAgenda extends Model
         'description',
         'is_show_to_other',
         'status',
-        'ceated_by',
+        'created_by',
     ];
 
     protected $casts = [
@@ -28,7 +28,7 @@ class MyAgenda extends Model
 
     public function creator()
     {
-        return $this->belongsTo(User::class, 'ceated_by');
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     // Auto set deleted_at when status is cancelled

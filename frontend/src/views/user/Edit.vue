@@ -1,50 +1,107 @@
 <template>
   <AdminLayout>
     <div class="page-header">
-      <h2 class="page-title">Edit Ruangan</h2>
-      <router-link to="/rooms" class="btn btn-secondary">← Kembali</router-link>
+      <h2 class="page-title">Edit Pengguna</h2>
+      <router-link to="/users" class="btn btn-secondary">← Kembali</router-link>
     </div>
 
     <LoadingSpinner v-if="loadingData" text="Memuat data..." />
 
-    <div v-else-if="room" class="form-container">
+    <div v-else-if="user" class="form-container">
       <form @submit.prevent="handleSubmit">
-        <!-- Judul -->
+        <!-- Username -->
         <div class="form-group">
-          <label class="form-label">Nama Ruangan *</label>
+          <label class="form-label">Username</label>
           <input
             type="text"
             class="form-input"
-            v-model="form.name"
-            placeholder="Masukkan nama ruangan"
-            required
+            v-model.trim="form.username"
+            placeholder="Masukkan username"
           />
         </div>
 
+        <!-- Password -->
         <div class="form-group">
-          <label class="form-label">Lokasi</label>
+          <label class="form-label">Password</label>
           <input
-            type="text"
+            type="password"
             class="form-input"
-            v-model="form.location"
-            placeholder="Masukkan lokasi ruangan"
-            required
+            v-model="form.password"
+            placeholder="Kosongkan jika tidak ingin mengubah password"
           />
         </div>
 
+        <!-- Nama -->
         <div class="form-group">
-          <label class="form-label">Kapasitas Ruangan</label>
+          <label class="form-label">Nama</label>
           <input
             type="text"
             class="form-input"
-            v-model="form.capacity"
-            placeholder="Masukkan kapasitas ruangan"
+            v-model.trim="form.name"
+            placeholder="Masukkan nama pengguna"
           />
+        </div>
+
+        <!-- No WhatsApp -->
+        <div class="form-group">
+          <label class="form-label">No WhatsApp</label>
+          <input
+            type="text"
+            class="form-input"
+            v-model.trim="form.whatsapp_number"
+            placeholder="Masukkan nomor WhatsApp"
+          />
+        </div>
+
+        <!-- Email -->
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input
+            type="email"
+            class="form-input"
+            v-model.trim="form.email"
+            placeholder="Masukkan email pengguna"
+          />
+        </div>
+
+        <!-- Alamat -->
+        <div class="form-group">
+          <label class="form-label">Alamat</label>
+          <input
+            type="text"
+            class="form-input"
+            v-model.trim="form.address"
+            placeholder="Masukkan alamat pengguna"
+          />
+        </div>
+
+        <!-- Role -->
+        <div class="form-group">
+          <label class="form-label">Role</label>
+          <select class="form-input" v-model="form.role">
+            <option value="">-- Pilih Role --</option>
+            <!-- Hapus Super Admin di sini -->
+            <option value="admin">Admin</option>
+            <option value="staff">Staff</option>
+          </select>
+        </div>
+
+        <!-- Foto -->
+        <div class="form-group">
+          <label class="form-label">Foto Profil</label>
+          <input type="file" class="form-input" @change="handleFileChange" accept="image/*" />
+          <div v-if="user.photo" style="margin-top: 8px">
+            <img
+              :src="`/storage/${user.photo}`"
+              alt="Foto Profil"
+              style="width: 100px; border-radius: 6px; border: 1px solid #ddd"
+            />
+          </div>
         </div>
 
         <!-- Actions -->
         <div class="form-actions">
-          <router-link to="/rooms" class="btn btn-secondary">Batal</router-link>
+          <router-link to="/users" class="btn btn-secondary">Batal</router-link>
           <button type="submit" class="btn btn-primary" :disabled="loading">
             <span v-if="!loading">💾 Simpan Perubahan</span>
             <span v-else>Menyimpan...</span>
@@ -61,9 +118,8 @@ import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { useNotificationStore } from '@/stores/notification'
-import roomService from '@/services/roomService'
+import userService from '@/services/userService.js'
 import { handleError } from '@/utils/helpers'
-import '@vueup/vue-quill/dist/vue-quill.snow.css'
 
 const route = useRoute()
 const router = useRouter()
@@ -71,53 +127,110 @@ const notificationStore = useNotificationStore()
 
 const loadingData = ref(true)
 const loading = ref(false)
-const room = ref(null)
+const user = ref(null)
 
 const form = ref({
+  username: '',
+  password: '',
   name: '',
-  location: '',
-  capacity: '',
-  is_available: true,
+  whatsapp_number: '',
+  email: '',
+  address: '',
+  role: '',
+  photo: null,
 })
 
 onMounted(async () => {
   try {
-    const data = await roomService.getById(route.params.id)
-    room.value = data
+    const data = await userService.getById(route.params.id)
+    user.value = data
 
-    form.value.name = data.name
-    form.value.location = data.location
-    form.value.capacity = data.capacity
+    form.value.username = data.username || ''
+    form.value.name = data.name || ''
+    form.value.whatsapp_number = data.whatsapp_number || ''
+    form.value.email = data.email || ''
+    form.value.address = data.address || ''
+    form.value.role = data.roles?.[0]?.name || ''
   } catch (error) {
     notificationStore.error(handleError(error))
-    router.push('/rooms')
+    router.push('/users')
   } finally {
     loadingData.value = false
   }
 })
 
+const handleFileChange = (e) => {
+  const file = e.target.files[0]
+  if (file) {
+    if (!file.type.startsWith('image/')) {
+      notificationStore.error('File harus berupa gambar')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      notificationStore.error('Ukuran file maksimal 2MB')
+      return
+    }
+    form.value.photo = file
+  }
+}
+
 const handleSubmit = async () => {
+  if (!form.value.username.trim()) {
+    notificationStore.error('Username wajib diisi')
+    return
+  }
+
   if (!form.value.name.trim()) {
-    notificationStore.error('Nama ruangan wajib diisi')
+    notificationStore.error('Nama wajib diisi')
     return
   }
 
-  if (!form.value.location.trim()) {
-    notificationStore.error('Lokasi ruangan wajib diisi')
+  if (!form.value.email.trim()) {
+    notificationStore.error('Email wajib diisi')
     return
   }
 
-  const formData = new FormData()
-  formData.append('name', form.value.name)
-  formData.append('location', form.value.location)
-  formData.append('capacity', form.value.capacity || '')
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(form.value.email)) {
+    notificationStore.error('Format email tidak valid')
+    return
+  }
+
+  if (!form.value.whatsapp_number.trim()) {
+    notificationStore.error('Nomor Whatsapp wajib diisi')
+    return
+  }
+
+  if (!form.value.role) {
+    notificationStore.error('Role wajib dipilih')
+    return
+  }
+
+  const payload = {
+    username: form.value.username.trim(),
+    name: form.value.name.trim(),
+    email: form.value.email.trim(),
+    whatsapp_number: form.value.whatsapp_number.trim(),
+    address: form.value.address?.trim() || '',
+    role: form.value.role,
+  }
+
+  if (form.value.password) {
+    if (form.value.password.length < 8) {
+      notificationStore.error('Password minimal 8 karakter')
+      return
+    }
+    payload.password = form.value.password
+  }
+
+  if (form.value.photo) payload.photo = form.value.photo
+
   loading.value = true
   try {
-    await roomService.update(route.params.id, formData)
-    notificationStore.success('Ruangan berhasil diperbarui ✅')
-    router.push('/rooms')
+    await userService.update(route.params.id, payload)
+    notificationStore.success('Pengguna berhasil diperbarui ✅')
+    router.push('/users')
   } catch (error) {
-    console.error('❌ Error update:', error)
     notificationStore.error(handleError(error))
   } finally {
     loading.value = false
@@ -154,84 +267,6 @@ const handleSubmit = async () => {
   border: 1px solid #ddd;
   border-radius: 8px;
   font-size: 14px;
-}
-
-.quill-editor .ql-container {
-  min-height: 300px;
-}
-
-.quill-editor .ql-editor {
-  min-height: 300px;
-  padding-bottom: 50px;
-}
-
-.existing-attachment-list {
-  list-style: none;
-  padding: 0;
-  background: #f9f9f9;
-  padding: 12px;
-  border-radius: 8px;
-}
-
-.existing-attachment-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #eee;
-}
-
-.existing-attachment-list li:last-child {
-  border-bottom: none;
-}
-
-.existing-attachment-list a {
-  color: #1976d2;
-  text-decoration: none;
-  font-size: 14px;
-}
-
-.remove-btn {
-  background: transparent;
-  border: none;
-  color: #d32f2f;
-  cursor: pointer;
-  font-size: 16px;
-}
-
-.attachment-list {
-  list-style: none;
-  padding-left: 0;
-  margin-top: 8px;
-}
-
-.attachment-list li {
-  margin-top: 6px;
-  font-size: 13px;
-  color: #555;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.remove-file-btn {
-  background: transparent;
-  border: none;
-  color: red;
-  font-size: 14px;
-  cursor: pointer;
-  margin-left: 8px;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.checkbox-input {
-  width: 20px;
-  height: 20px;
 }
 
 .form-actions {

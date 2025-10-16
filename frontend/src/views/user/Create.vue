@@ -1,49 +1,104 @@
 <template>
   <AdminLayout>
     <div class="page-header">
-      <h2 class="page-title">Tambah Ruangan</h2>
-      <router-link to="/rooms" class="btn btn-secondary">
+      <h2 class="page-title">Tambah Pengguna</h2>
+      <router-link to="/users" class="btn btn-secondary">
         <ArrowLeft :size="18" /> Kembali
       </router-link>
     </div>
 
     <div class="form-container">
       <form @submit.prevent="handleSubmit">
+        <!-- Username -->
+        <div class="form-group">
+          <label class="form-label">Username *</label>
+          <input
+            type="text"
+            class="form-input"
+            v-model.trim="form.username"
+            placeholder="Masukkan username pengguna"
+            required
+          />
+        </div>
+
+        <!-- Password -->
+        <div class="form-group">
+          <label class="form-label">Password *</label>
+          <input
+            type="password"
+            class="form-input"
+            v-model="form.password"
+            placeholder="Minimal 8 karakter"
+            required
+          />
+        </div>
+
+        <!-- Nama -->
         <div class="form-group">
           <label class="form-label">Nama *</label>
           <input
             type="text"
             class="form-input"
-            v-model="form.name"
-            placeholder="Masukkan nama ruangan"
+            v-model.trim="form.name"
+            placeholder="Masukkan nama pengguna"
             required
           />
         </div>
 
+        <!-- No WhatsApp -->
         <div class="form-group">
-          <label class="form-label">Lokasi *</label>
+          <label class="form-label">No Whatsapp *</label>
           <input
             type="text"
             class="form-input"
-            v-model="form.location"
-            placeholder="Masukkan lokasi ruangan"
+            v-model.trim="form.whatsapp_number"
+            placeholder="Masukkan no whatsapp pengguna"
             required
           />
         </div>
 
+        <!-- Email -->
         <div class="form-group">
-          <label class="form-label">Kapasitas</label>
+          <label class="form-label">Email *</label>
+          <input
+            type="email"
+            class="form-input"
+            v-model.trim="form.email"
+            placeholder="Masukkan email pengguna"
+            required
+          />
+        </div>
+
+        <!-- Alamat -->
+        <div class="form-group">
+          <label class="form-label">Alamat</label>
           <input
             type="text"
             class="form-input"
-            v-model="form.capacity"
-            placeholder="Masukkan kapasitas ruangan"
-            required
+            v-model.trim="form.address"
+            placeholder="Masukkan alamat pengguna"
           />
         </div>
 
+        <!-- Role -->
+        <div class="form-group">
+          <label class="form-label">Role *</label>
+          <select class="form-input" v-model="form.role" required>
+            <option value="">-- Pilih Role --</option>
+            <option value="admin">Admin</option>
+            <option value="staff">Staff</option>
+          </select>
+        </div>
+
+        <!-- Foto -->
+        <div class="form-group">
+          <label class="form-label">Foto Profile</label>
+          <input type="file" class="form-input" @change="handleFileChange" accept="image/*" />
+        </div>
+
+        <!-- Actions -->
         <div class="form-actions">
-          <router-link to="/rooms" class="btn btn-secondary">Batal</router-link>
+          <router-link to="/users" class="btn btn-secondary">Batal</router-link>
           <button type="submit" class="btn btn-primary" :disabled="loading">
             <Save :size="18" v-if="!loading" />
             <span v-if="!loading">Simpan</span>
@@ -61,31 +116,55 @@ import { useRouter } from 'vue-router'
 import { ArrowLeft, Save } from 'lucide-vue-next'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { useNotificationStore } from '@/stores/notification'
-import roomService from '@/services/roomService'
+import userService from '@/services/userService.js'
 import { handleError } from '@/utils/helpers'
 
 const router = useRouter()
 const notificationStore = useNotificationStore()
-
 const loading = ref(false)
+
 const form = ref({
+  username: '',
+  password: '',
   name: '',
-  location: '',
-  capacity: '',
-  is_available: true,
+  whatsapp_number: '',
+  email: '',
+  address: '',
+  role: '',
+  photo: null,
 })
 
-const handleSubmit = async () => {
-  if (!form.value.name.trim()) {
-    notificationStore.error('Nama ruangan wajib diisi')
-    return
+const handleFileChange = (e) => {
+  const file = e.target.files[0]
+  if (file) {
+    if (!file.type.startsWith('image/')) {
+      notificationStore.error('File harus berupa gambar')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      notificationStore.error('Ukuran file maksimal 2MB')
+      return
+    }
+    form.value.photo = file
   }
+}
+
+const handleSubmit = async () => {
+  // ✨ Frontend validation sesuai BE
+  if (!form.value.username) return notificationStore.error('Username wajib diisi')
+  if (!form.value.password || form.value.password.length < 8)
+    return notificationStore.error('Password minimal 8 karakter')
+  if (!form.value.name) return notificationStore.error('Nama wajib diisi')
+  if (!form.value.whatsapp_number) return notificationStore.error('Nomor WhatsApp wajib diisi')
+  if (!form.value.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email))
+    return notificationStore.error('Email tidak valid')
+  if (!form.value.role) return notificationStore.error('Role wajib dipilih')
 
   loading.value = true
   try {
-    await roomService.create(form.value)
-    notificationStore.success('Ruangan berhasil ditambahkan')
-    router.push('/rooms')
+    await userService.create(form.value)
+    notificationStore.success('Pengguna berhasil ditambahkan')
+    router.push('/users')
   } catch (error) {
     notificationStore.error(handleError(error))
   } finally {

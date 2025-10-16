@@ -13,11 +13,8 @@ export default {
 
   async create(data) {
     const formData = new FormData()
-
     Object.keys(data).forEach((key) => {
-      if (key === 'photo' && data[key]) {
-        formData.append('photo', data[key])
-      } else if (data[key] !== null && data[key] !== undefined) {
+      if (data[key] !== null && data[key] !== undefined) {
         formData.append(key, data[key])
       }
     })
@@ -30,16 +27,13 @@ export default {
 
   async update(id, data) {
     const formData = new FormData()
-
     Object.keys(data).forEach((key) => {
-      if (key === 'photo' && data[key] instanceof File) {
-        formData.append('photo', data[key])
-      } else if (data[key] !== null && data[key] !== undefined) {
+      if (data[key] !== null && data[key] !== undefined) {
         formData.append(key, data[key])
       }
     })
 
-    const response = await api.post(`/users/${id}`, formData, {
+    const response = await api.post(`/users/${id}?_method=PUT`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     return response.data
@@ -50,7 +44,6 @@ export default {
     return response.data
   },
 
-  // userService.js
   async restore(id) {
     const response = await api.post(`/users/${id}/restore`)
     return response.data
