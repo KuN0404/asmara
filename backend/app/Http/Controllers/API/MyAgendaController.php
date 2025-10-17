@@ -10,11 +10,24 @@ class MyAgendaController extends Controller
 {
 public function index(Request $request)
 {
-    $agendas = MyAgenda::with('creator')
-        ->withTrashed() // TAMBAHKAN INI
-        ->where('created_by', $request->user()->id)
-        ->when($request->status, fn($q) => $q->where('status', $request->status))
-        ->orderBy('start_at', 'desc')
+    $query = MyAgenda::with('creator')
+        ->withTrashed()
+        ->where('created_by', $request->user()->id);
+
+    // Tambah filter tanggal
+    if ($request->start_date) {
+        $query->whereDate('start_at', '>=', $request->start_date);
+    }
+
+    if ($request->end_date) {
+        $query->whereDate('start_at', '<=', $request->end_date);
+    }
+
+    if ($request->status) {
+        $query->where('status', $request->status);
+    }
+
+    $agendas = $query->orderBy('start_at', 'desc')
         ->paginate($request->per_page ?? 15);
 
     return response()->json($agendas);
@@ -86,13 +99,24 @@ public function update(Request $request, $id)
 
 public function publicAgendas(Request $request)
 {
-    $agendas = MyAgenda::with('creator')
-        ->withTrashed() // TAMBAHKAN INI
+    $query = MyAgenda::with('creator')
+        ->withTrashed()
         ->where('is_show_to_other', true)
-        ->where('created_by', '!=', $request->user()->id)
-        ->orderBy('start_at', 'desc')
+        ->where('created_by', '!=', $request->user()->id);
+
+    // Tambah filter tanggal
+    if ($request->start_date) {
+        $query->whereDate('start_at', '>=', $request->start_date);
+    }
+
+    if ($request->end_date) {
+        $query->whereDate('start_at', '<=', $request->end_date);
+    }
+
+    $agendas = $query->orderBy('start_at', 'desc')
         ->paginate($request->per_page ?? 15);
 
     return response()->json($agendas);
 }
+
 }

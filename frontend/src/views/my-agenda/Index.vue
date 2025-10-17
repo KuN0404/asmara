@@ -60,9 +60,10 @@
                     : `event-${agenda.status}`,
                 ]"
                 @click.stop="viewAgenda(agenda)"
+                :title="`${formatTime(agenda.start_at)} - ${agenda.title}`"
               >
                 <span class="event-time">{{ formatTime(agenda.start_at) }}</span>
-                <span class="event-title">{{ agenda.title }}</span>
+                <span class="event-title">{{ truncateTitle(agenda.title, 15) }}</span>
               </div>
 
               <div v-if="day.agendas.length > 3" class="event-more">
@@ -325,6 +326,12 @@ const allAgendas = computed(() => {
   return [...agendas.value, ...publicAgendas.value]
 })
 
+const truncateTitle = (title, maxLength = 15) => {
+  if (!title) return ''
+  if (title.length <= maxLength) return title
+  return title.substring(0, maxLength) + '...'
+}
+
 const currentYear = ref(new Date().getFullYear())
 const currentMonth = ref(new Date().getMonth())
 const monthNames = [
@@ -542,7 +549,7 @@ const previousMonth = async () => {
   } else {
     currentMonth.value--
   }
-  await loadAgendas()
+  await Promise.all([loadAgendas(), loadPublicAgendas()]) // Fetch ulang data
 }
 
 const nextMonth = async () => {
@@ -552,13 +559,14 @@ const nextMonth = async () => {
   } else {
     currentMonth.value++
   }
-  await loadAgendas()
+  await Promise.all([loadAgendas(), loadPublicAgendas()]) // Fetch ulang data
 }
 
-const goToToday = () => {
+const goToToday = async () => {
   const today = new Date()
   currentYear.value = today.getFullYear()
   currentMonth.value = today.getMonth()
+  await Promise.all([loadAgendas(), loadPublicAgendas()]) // Fetch ulang data
 }
 
 const selectDate = (day) => {
@@ -698,7 +706,13 @@ const handleSubmit = async () => {
 const loadAgendas = async () => {
   loading.value = true
   try {
-    const response = await myAgendaService.getAll({ per_page: 1000 })
+    // Range 3 bulan (bulan lalu, bulan ini, bulan depan)
+    const startDate = new Date(currentYear.value, currentMonth.value - 1, 1)
+    const endDate = new Date(currentYear.value, currentMonth.value + 2, 0)
+
+    const response = await myAgendaService.getAll({
+      per_page: 500, // Cukup untuk 3 bulan
+    })
 
     let agendasData = []
     if (response.data && Array.isArray(response.data)) {
@@ -709,17 +723,23 @@ const loadAgendas = async () => {
       agendasData = response
     }
 
+    // Filter di frontend untuk 3 bulan
+    agendasData = agendasData.filter((agenda) => {
+      if (!agenda.start_at) return false
+      const agendaDate = new Date(agenda.start_at)
+      return agendaDate >= startDate && agendaDate <= endDate
+    })
+
     // Auto-update status agenda yang outdated
     for (const agenda of agendasData) {
       if (['comming_soon', 'in_progress'].includes(agenda.status)) {
         const calculatedStatus = calculateStatus(agenda.start_at, agenda.until_at)
         if (calculatedStatus !== agenda.status) {
-          // Update di backend tanpa notifikasi
           try {
             await myAgendaService.update(agenda.id, { status: calculatedStatus })
-            agenda.status = calculatedStatus // Update local
+            agenda.status = calculatedStatus
           } catch (error) {
-            // Silent fail, tidak ganggu UX
+            // Silent fail
           }
         }
       }
@@ -736,7 +756,13 @@ const loadAgendas = async () => {
 
 const loadPublicAgendas = async () => {
   try {
-    const response = await myAgendaService.getPublicAgendas({ per_page: 1000 })
+    // Range 3 bulan (bulan lalu, bulan ini, bulan depan)
+    const startDate = new Date(currentYear.value, currentMonth.value - 1, 1)
+    const endDate = new Date(currentYear.value, currentMonth.value + 2, 0)
+
+    const response = await myAgendaService.getPublicAgendas({
+      per_page: 500,
+    })
 
     let publicData = []
     if (response.data && Array.isArray(response.data)) {
@@ -747,9 +773,15 @@ const loadPublicAgendas = async () => {
       publicData = response
     }
 
+    // Filter di frontend untuk 3 bulan
+    publicData = publicData.filter((agenda) => {
+      if (!agenda.start_at) return false
+      const agendaDate = new Date(agenda.start_at)
+      return agendaDate >= startDate && agendaDate <= endDate
+    })
+
     publicAgendas.value = publicData
   } catch (error) {
-    // Silent fail untuk public agendas
     publicAgendas.value = []
   }
 }
@@ -1075,6 +1107,8 @@ onMounted(async () => {
   gap: 4px;
   align-items: center;
   border-left: 3px solid;
+  min-width: 0; /* Tambahkan ini */
+  overflow: hidden; /* Tambahkan ini */
 }
 
 .event-item:hover {
@@ -1117,12 +1151,15 @@ onMounted(async () => {
 .event-time {
   font-weight: 600;
   white-space: nowrap;
+  flex-shrink: 0; /* Tambahkan ini */
 }
 
 .event-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1; /* Tambahkan ini */
+  min-width: 0; /* Tambahkan ini */
 }
 
 .event-more {
