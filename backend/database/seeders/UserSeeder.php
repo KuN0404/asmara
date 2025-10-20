@@ -4,12 +4,17 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\User;
+use Faker\Factory as Faker;
 
 class UserSeeder extends Seeder
 {
     public function run()
     {
-      $superAdminUser = User::create([
+        // Buat Faker Indonesia
+        $faker = Faker::create('id_ID');
+
+        // ✅ Super Admin
+        $superAdminUser = User::create([
             'username' => 'superadmin',
             'name' => 'Super Admin',
             'email' => 'superadmin@example.com',
@@ -19,7 +24,7 @@ class UserSeeder extends Seeder
         ]);
         $superAdminUser->assignRole('super_admin');
 
-        // Create Admin user
+        // ✅ Admin
         $adminUser = User::create([
             'username' => 'admin',
             'name' => 'Admin User',
@@ -30,7 +35,7 @@ class UserSeeder extends Seeder
         ]);
         $adminUser->assignRole('admin');
 
-        // Create Staff user
+        // ✅ Staff
         $staffUser = User::create([
             'username' => 'staff',
             'name' => 'Staff User',
@@ -40,5 +45,20 @@ class UserSeeder extends Seeder
             'address' => 'Bandar Lampung',
         ]);
         $staffUser->assignRole('staff');
+
+        // ✅ Tambah 20 user random
+        for ($i = 1; $i <= 20; $i++) {
+            $user = User::create([
+                'username' => 'user' . $i,
+                'name' => $faker->name,
+                'email' => 'user' . $i . '@example.com',
+                'password' => bcrypt('password'),
+                'whatsapp_number' => '08' . $faker->numerify('##########'),
+                'address' => $faker->city,
+            ]);
+
+            // Bisa kasih role default misal "staff"
+            $user->assignRole('staff');
+        }
     }
 }

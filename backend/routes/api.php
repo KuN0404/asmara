@@ -46,15 +46,24 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('participants/{id}', [ParticipantController::class, 'destroy']);
     });
 
-    // Office Agendas - Super Admin & Admin full access
-    Route::middleware('role:super_admin,admin')->group(function () {
-        Route::apiResource('office-agendas', OfficeAgendaController::class);
-    });
-    // Staff can only view
-    Route::middleware('role:staff')->group(function () {
-        Route::get('office-agendas', [OfficeAgendaController::class, 'index']);
-        Route::get('office-agendas/{id}', [OfficeAgendaController::class, 'show']);
-    });
+// Office Agendas - SEMUA user bisa view
+// Route::get('office-agendas', [OfficeAgendaController::class, 'index']);
+// Route::get('office-agendas/{id}', [OfficeAgendaController::class, 'show']);
+
+// // Hanya Super Admin & Admin bisa manage
+// Route::middleware('role:super_admin,admin')->group(function () {
+//     Route::post('office-agendas', [OfficeAgendaController::class, 'store']);
+//     Route::put('office-agendas/{id}', [OfficeAgendaController::class, 'update']);
+//     Route::delete('office-agendas/{id}', [OfficeAgendaController::class, 'destroy']);
+// });
+
+Route::middleware(['auth:sanctum'])->group(function () {
+    // Office Agenda routes
+    Route::apiResource('office-agendas', OfficeAgendaController::class);
+
+    // Delete specific attachment
+    Route::delete('office-agendas/{officeAgenda}/attachments', [OfficeAgendaController::class, 'deleteAttachment']);
+});
 
     // My Agendas - All authenticated users
     Route::apiResource('my-agendas', MyAgendaController::class);
