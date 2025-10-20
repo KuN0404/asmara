@@ -460,7 +460,7 @@
                     <div class="detail-value">{{ selectedAgenda.description }}</div>
                   </div>
 
-                  <div
+                  <!-- <div
                     class="detail-item full-width"
                     v-if="selectedAgenda.userParticipants?.length > 0"
                   >
@@ -469,6 +469,24 @@
                       <div class="participant-list">
                         <span
                           v-for="u in selectedAgenda.userParticipants"
+                          :key="u.id"
+                          class="participant-tag participant-internal"
+                        >
+                          {{ u.name }} - {{ u.email }}
+                        </span>
+                      </div>
+                    </div>
+                  </div> -->
+
+                  <div
+                    class="detail-item full-width"
+                    v-if="selectedAgenda.user_participants?.length > 0"
+                  >
+                    <label class="detail-label">Peserta Internal:</label>
+                    <div class="detail-value">
+                      <div class="participant-list">
+                        <span
+                          v-for="u in selectedAgenda.user_participants"
                           :key="u.id"
                           class="participant-tag participant-internal"
                         >
@@ -502,7 +520,7 @@
                     <label class="detail-label">Lampiran:</label>
                     <div class="detail-value">
                       <div class="attachment-list">
-                        <a
+                        <!-- <a
                           v-for="attachment in selectedAgenda.attachments"
                           :key="attachment.id"
                           :href="`/storage/${attachment.file_path}`"
@@ -516,6 +534,21 @@
                           <span class="attachment-size"
                             >({{ formatFileSize(attachment.file_size) }})</span
                           >
+                        </a> -->
+                        <a
+                          v-for="attachment in selectedAgenda.attachments"
+                          :key="attachment.id"
+                          :href="`/storage/${attachment.file_path}`"
+                          :download="attachment.file_name"
+                          class="attachment-item"
+                        >
+                          <span class="attachment-icon">{{
+                            getFileIcon(attachment.file_type)
+                          }}</span>
+                          <span class="attachment-name">{{ attachment.file_name }}</span>
+                          <span class="attachment-size">
+                            ({{ formatFileSize(attachment.file_size) }})
+                          </span>
                         </a>
                       </div>
                     </div>
@@ -675,7 +708,8 @@ const selectAllInternalParticipants = () => {
 
 const handleFileUpload = (event) => {
   const files = Array.from(event.target.files)
-  const maxSize = 10 * 1024 * 1024 // 10MB
+  // const maxSize = 10 * 1024 * 1024 // 10MB
+  const maxSize = 2.5 * 1024 * 1024 // 2.5MB
 
   const validFiles = files.filter((file) => {
     if (file.size > maxSize) {
