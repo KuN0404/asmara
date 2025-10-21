@@ -53,10 +53,10 @@
 
       <div class="nav-section">
         <div class="nav-section-title">Akun</div>
-        <a href="#" @click.prevent="handleLogout" class="nav-item">
-          <span class="nav-icon">🚪</span>
-          <span>Logout</span>
-        </a>
+        <router-link to="/profile" class="nav-item" active-class="active">
+          <span class="nav-icon">👤</span>
+          <span>Profil Saya</span>
+        </router-link>
       </div>
     </nav>
   </aside>
@@ -88,12 +88,5 @@ const getRoleName = (role) => {
     staff: 'Staff',
   }
   return roles[role] || role
-}
-
-const handleLogout = async () => {
-  if (confirm('Apakah Anda yakin ingin logout?')) {
-    await authStore.logout()
-    router.push('/login')
-  }
 }
 </script>

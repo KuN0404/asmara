@@ -146,6 +146,12 @@ const routes = [
     component: () => import('@/views/participant/Edit.vue'),
     meta: { requiresAuth: true, layout: 'admin', roles: ['super_admin', 'admin'] },
   },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: () => import('@/views/Profile.vue'),
+    meta: { requiresAuth: true, layout: 'admin' },
+  },
 ]
 
 const router = createRouter({

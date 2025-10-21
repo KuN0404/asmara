@@ -1,13 +1,14 @@
 <?php
 
-use App\Http\Controllers\API\AuthController;
-use App\Http\Controllers\API\UserController;
-use App\Http\Controllers\API\RoomController;
-use App\Http\Controllers\API\ParticipantController;
-use App\Http\Controllers\API\OfficeAgendaController;
-use App\Http\Controllers\API\MyAgendaController;
-use App\Http\Controllers\API\AnnouncementController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\API\AuthController;
+use App\Http\Controllers\API\RoomController;
+use App\Http\Controllers\API\UserController;
+use App\Http\Controllers\API\ProfileController;
+use App\Http\Controllers\API\MyAgendaController;
+use App\Http\Controllers\API\ParticipantController;
+use App\Http\Controllers\API\AnnouncementController;
+use App\Http\Controllers\API\OfficeAgendaController;
 
 // Public routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -17,6 +18,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+
+    Route::get('/profile', [ProfileController::class, 'show']);
+    Route::post('/profile', [ProfileController::class, 'update']);
 
     // Users - Only Super Admin
     Route::middleware('role:super_admin,admin')->group(function () {
@@ -46,21 +50,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('participants/{id}', [ParticipantController::class, 'destroy']);
     });
 
-// Office Agendas - SEMUA user bisa view
-// Route::get('office-agendas', [OfficeAgendaController::class, 'index']);
-// Route::get('office-agendas/{id}', [OfficeAgendaController::class, 'show']);
 
-// // Hanya Super Admin & Admin bisa manage
-// Route::middleware('role:super_admin,admin')->group(function () {
-//     Route::post('office-agendas', [OfficeAgendaController::class, 'store']);
-//     Route::put('office-agendas/{id}', [OfficeAgendaController::class, 'update']);
-//     Route::delete('office-agendas/{id}', [OfficeAgendaController::class, 'destroy']);
-// });
-
-Route::middleware(['auth:sanctum'])->group(function () {
-    // Office Agenda routes
-    Route::apiResource('office-agendas', OfficeAgendaController::class);
-
+// Office Agenda routes
+Route::apiResource('office-agendas', OfficeAgendaController::class);
+Route::middleware('role:super_admin,admin')->group(function () {
     // Delete specific attachment
     Route::delete('office-agendas/{officeAgenda}/attachments', [OfficeAgendaController::class, 'deleteAttachment']);
 });
