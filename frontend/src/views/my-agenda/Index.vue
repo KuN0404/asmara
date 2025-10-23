@@ -669,6 +669,14 @@ const resetForm = () => {
 }
 
 const handleSubmit = async () => {
+  const now = new Date()
+  const startDate = new Date(form.value.start_at)
+
+  if (startDate < now && !editMode.value) {
+    notificationStore.error('Tanggal dan waktu tidak valid')
+    return
+  }
+
   submitting.value = true
   try {
     // Auto-set status berdasarkan tanggal

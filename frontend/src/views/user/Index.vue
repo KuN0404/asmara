@@ -10,8 +10,8 @@
 
     <div class="user-table-container">
       <div class="filter-container">
-        <label>Status:</label>
-        <select v-model="statusFilter" @change="loadUsers">
+        <label for="status-filter">Status:</label>
+        <select id="status-filter" v-model="statusFilter" @change="loadUsers" class="filter-select">
           <option value="active">Aktif</option>
           <option value="inactive">Nonaktif</option>
           <option value="all">Semua</option>
@@ -182,6 +182,47 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.filter-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  background: #fff;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.filter-container label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+}
+
+.filter-select {
+  padding: 10px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #333;
+  background-color: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 150px;
+  font-weight: 500;
+}
+
+.filter-select:hover {
+  border-color: #1976d2;
+  background-color: #f8f9fa;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.1);
+}
+
 .table-card {
   background: #ffffff;
   border-radius: 12px;
@@ -266,24 +307,35 @@ onMounted(() => {
   color: #d32f2f;
 }
 
+.btn-sm.btn-restore {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
 .btn-sm:hover {
   opacity: 0.8;
   transition: 0.2s;
 }
 
 .badge-active {
-  background: #4caf50;
-  color: #fff;
-  padding: 4px 12px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 6px 14px;
   border-radius: 20px;
   font-size: 13px;
+  font-weight: 500;
+  display: inline-block;
+  border: 1px solid #a5d6a7;
 }
 
 .badge-inactive {
-  background: #ccc;
-  color: #fff;
-  padding: 4px 12px;
+  background: #f5f5f5;
+  color: #757575;
+  padding: 6px 14px;
   border-radius: 20px;
   font-size: 13px;
+  font-weight: 500;
+  display: inline-block;
+  border: 1px solid #e0e0e0;
 }
 </style>

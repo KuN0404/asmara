@@ -9,7 +9,7 @@
       <div class="stats-grid">
         <div class="stat-card primary">
           <div class="stat-header">
-            <div class="stat-title">Total Agenda Kantor</div>
+            <div class="stat-title">Total Agenda Kantor yang akan datang</div>
             <div class="stat-icon">📋</div>
           </div>
           <div class="stat-value">{{ stats.totalOfficeAgendas }}</div>
@@ -18,7 +18,7 @@
 
         <div class="stat-card success">
           <div class="stat-header">
-            <div class="stat-title">Agenda Hari Ini</div>
+            <div class="stat-title">Agenda kantor Hari Ini</div>
             <div class="stat-icon">📅</div>
           </div>
           <div class="stat-value">{{ stats.todayAgendas }}</div>
@@ -27,7 +27,7 @@
 
         <div class="stat-card warning">
           <div class="stat-header">
-            <div class="stat-title">Agenda Saya</div>
+            <div class="stat-title">Total Agenda Saya yang akan datang</div>
             <div class="stat-icon">⏰</div>
           </div>
           <div class="stat-value">{{ stats.myAgendas }}</div>
@@ -36,11 +36,11 @@
 
         <div class="stat-card danger">
           <div class="stat-header">
-            <div class="stat-title">Pengumuman Aktif</div>
+            <div class="stat-title">Agenda Saya Hari Ini</div>
             <div class="stat-icon">✅</div>
           </div>
-          <div class="stat-value">{{ stats.activeAnnouncements }}</div>
-          <div class="stat-change positive"><span>↗</span> Sedang ditampilkan</div>
+          <div class="stat-value">{{ stats.myTodayAgendas }}</div>
+          <div class="stat-change positive"><span>↗</span> Agenda pribadi hari ini</div>
         </div>
       </div>
 
@@ -51,17 +51,20 @@
             <h3 class="card-title">Pengumuman Terbaru</h3>
           </div>
           <div class="activity-list">
-            <div
+            <router-link
               v-for="announcement in recentAnnouncements"
               :key="announcement.id"
-              class="activity-item"
+              :to="`/announcements/${announcement.id}`"
+              class="activity-item-link"
             >
-              <div class="activity-icon add">📢</div>
-              <div class="activity-content">
-                <div class="activity-title">{{ announcement.title }}</div>
-                <div class="activity-time">{{ formatDateTime(announcement.created_at) }}</div>
+              <div class="activity-item">
+                <div class="activity-icon add">📢</div>
+                <div class="activity-content">
+                  <div class="activity-title">{{ announcement.title }}</div>
+                  <div class="activity-time">{{ formatDateTime(announcement.created_at) }}</div>
+                </div>
               </div>
-            </div>
+            </router-link>
             <div v-if="recentAnnouncements.length === 0" class="empty-state">
               Belum ada pengumuman
             </div>
@@ -72,14 +75,14 @@
           <div class="card-header">
             <h3 class="card-title">Aksi Cepat</h3>
           </div>
-          <router-link to="/office-agenda/create" class="action-btn" v-if="canCreateOfficeAgenda">
+          <router-link to="/office-agenda" class="action-btn" v-if="canCreateOfficeAgenda">
             <span>➕</span>
             <div>
               <div style="font-weight: 500">Tambah Agenda Kantor</div>
               <div style="font-size: 0.85rem; color: #64748b">Buat agenda kantor baru</div>
             </div>
           </router-link>
-          <router-link to="/my-agenda/create" class="action-btn">
+          <router-link to="/my-agenda" class="action-btn">
             <span>📝</span>
             <div>
               <div style="font-weight: 500">Tambah Agenda Saya</div>
@@ -115,7 +118,7 @@ const stats = ref({
   totalOfficeAgendas: 0,
   todayAgendas: 0,
   myAgendas: 0,
-  activeAnnouncements: 0,
+  myTodayAgendas: 0,
 })
 const recentAnnouncements = ref([])
 
@@ -129,20 +132,74 @@ const canCreateAnnouncement = computed(
 
 const loadDashboardData = async () => {
   try {
-    const [officeAgendas, myAgendas, announcements] = await Promise.all([
-      officeAgendaService.getAll({ per_page: 100 }),
-      myAgendaService.getAll({ per_page: 100 }),
-      announcementService.getAll({ per_page: 5, is_displayed: 1 }),
+    const today = new Date().toISOString().split('T')[0]
+    const currentUserId = authStore.user?.id
+
+    // Load data
+    const [officeAgendasResponse, myAgendasResponse, announcementsResponse] = await Promise.all([
+      officeAgendaService.getAll({ per_page: 1000 }),
+      myAgendaService.getAll({ per_page: 1000 }),
+      announcementService.getAll({ per_page: 5, sort_by: 'created_at', sort_order: 'desc' }),
     ])
 
-    stats.value.totalOfficeAgendas = officeAgendas.total || 0
-    stats.value.myAgendas = myAgendas.total || 0
-    stats.value.activeAnnouncements = announcements.total || 0
+    const officeAgendas = officeAgendasResponse.data || []
+    const myAgendas = myAgendasResponse.data || []
 
-    const today = new Date().toISOString().split('T')[0]
-    stats.value.todayAgendas = officeAgendas.data.filter((a) => a.start_at.startsWith(today)).length
+    // Status yang tidak ditampilkan
+    const excludedStatuses = ['cancelled', 'completed', 'schedule_change']
 
-    recentAnnouncements.value = announcements.data || []
+    // ========== AGENDA KANTOR ==========
+    // Filter agenda kantor dimana user diajak sebagai participant
+    const myOfficeAgendas = officeAgendas.filter((agenda) => {
+      // Cek apakah user ada di user_participants
+      const isUserParticipant = agenda.user_participants?.some(
+        (participant) => participant.id === currentUserId,
+      )
+      return isUserParticipant && !excludedStatuses.includes(agenda.status)
+    })
+
+    // Agenda Kantor Yang Akan Datang (status: comming_soon)
+    stats.value.totalOfficeAgendas = myOfficeAgendas.filter(
+      (a) => a.status === 'comming_soon',
+    ).length
+
+    // Agenda Kantor Hari Ini (HANYA tanggal hari ini DAN status in_progress)
+    stats.value.todayAgendas = myOfficeAgendas.filter((a) => {
+      const agendaDate = a.start_at?.split('T')[0] || a.start_at?.split(' ')[0]
+      const isToday = agendaDate === today
+      const isInProgress = a.status === 'in_progress'
+
+      // Harus hari ini DAN sedang berlangsung
+      return isToday && isInProgress
+    }).length
+
+    // ========== AGENDA SAYA (MY AGENDA) ==========
+    // Filter agenda pribadi yang dibuat oleh user yang sedang login
+    const activeMyAgendas = myAgendas.filter(
+      (a) => a.created_by === currentUserId && !excludedStatuses.includes(a.status),
+    )
+
+    // Agenda Saya Yang Akan Datang (status: comming_soon)
+    stats.value.myAgendas = activeMyAgendas.filter((a) => a.status === 'comming_soon').length
+
+    // Agenda Saya Hari Ini (HANYA tanggal hari ini DAN status in_progress)
+    stats.value.myTodayAgendas = activeMyAgendas.filter((a) => {
+      const agendaDate = a.start_at?.split('T')[0] || a.start_at?.split(' ')[0]
+      const isToday = agendaDate === today
+      const isInProgress = a.status === 'in_progress'
+
+      // Harus hari ini DAN sedang berlangsung
+      return isToday && isInProgress
+    }).length
+
+    // ========== PENGUMUMAN ==========
+    let announcements = announcementsResponse.data || []
+    announcements.sort((a, b) => {
+      const dateA = new Date(a.created_at)
+      const dateB = new Date(b.created_at)
+      return dateB - dateA
+    })
+    recentAnnouncements.value = announcements.slice(0, 4)
   } catch (error) {
     console.error('Error loading dashboard:', error)
   } finally {
@@ -154,3 +211,25 @@ onMounted(() => {
   loadDashboardData()
 })
 </script>
+
+<style scoped>
+.activity-item-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: all 0.2s ease;
+}
+
+.activity-item-link:hover {
+  background-color: #f8fafc;
+  border-radius: 8px;
+}
+
+.activity-item-link:hover .activity-item {
+  transform: translateX(4px);
+}
+
+.activity-item {
+  transition: transform 0.2s ease;
+}
+</style>

@@ -1032,6 +1032,15 @@ const handleSubmit = async () => {
     return
   }
 
+  // Validasi tanggal tidak boleh di masa lalu
+  const now = new Date()
+  const startDate = new Date(form.value.start_at)
+
+  if (startDate < now && !editMode.value) {
+    notificationStore.error('Tanggal dan waktu tidak valid')
+    return
+  }
+
   submitting.value = true
   try {
     form.value.status = calculateStatus(form.value.start_at, form.value.until_at)
