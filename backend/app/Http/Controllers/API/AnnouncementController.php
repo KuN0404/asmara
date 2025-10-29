@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Models\User;
 use App\Models\Attachment;
 use App\Models\Announcement;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
+use App\Jobs\SendWhatsAppNotification;
 use Illuminate\Support\Facades\Storage;
 
 class AnnouncementController extends Controller
@@ -20,6 +23,84 @@ class AnnouncementController extends Controller
         return response()->json($announcements);
     }
 
+// public function store(Request $request)
+// {
+//     $validated = $request->validate([
+//         'title' => 'required|string',
+//         'content' => 'required|string',
+//         'is_displayed' => 'boolean',
+//         'attachments' => 'nullable|array',
+//         'attachments.*' => 'file|mimes:jpg,jpeg,png,pdf,doc,docx|max:10240',
+//     ]);
+
+//     $validated['created_by'] = $request->user()->id;
+//     $announcement = Announcement::create($validated);
+
+//     // Handle attachments
+//     if ($request->hasFile('attachments')) {
+//         $attachmentIds = [];
+//         foreach ($request->file('attachments') as $file) {
+//             $path = $file->store('attachments', 'public');
+//             $attachment = Attachment::create([
+//                 'file_name' => $file->getClientOriginalName(),
+//                 'file_path' => $path,
+//                 'file_type' => $file->getMimeType(),
+//                 'file_size' => $file->getSize(),
+//             ]);
+//             $attachmentIds[] = $attachment->id;
+//         }
+//         $announcement->attachments()->attach($attachmentIds);
+//     }
+
+//         DB::beginTransaction();
+//     try {
+//         $announcement = Announcement::create([
+//             'title' => $request->title,
+//             'content' => $request->content,
+//             'is_displayed' => $request->is_displayed ?? true,
+//             'created_by' => auth()->id(),
+//         ]);
+
+//         if ($request->has('attachments')) {
+//             $announcement->attachments()->sync($request->attachments);
+//         }
+
+//         // 🚀 SEND WHATSAPP NOTIFICATION TO ALL USERS
+//         $users = User::whereNotNull('whatsapp_number')->get();
+//         foreach ($users as $user) {
+//             $message = "📢 *PENGUMUMAN BARU*\n\n" .
+//                       "📌 {$announcement->title}\n\n" .
+//                       "{$announcement->content}\n\n" .
+//                       "_Pengumuman dari: " . auth()->user()->name . "_";
+
+//             SendWhatsAppNotification::dispatch(
+//                 $user->whatsapp_number,
+//                 $message,
+//                 'announcement',
+//                 'created',
+//                 $announcement->id
+//             );
+//         }
+
+//         DB::commit();
+//         // return response()->json($announcement->load('attachments'), 201);
+//     return response()->json([
+//         'message' => 'Pengumuman berhasil dibuat',
+//         'announcement' => $announcement->load('attachments'),
+//     ], 201);
+
+//     } catch (\Exception $e) {
+//         DB::rollBack();
+//         return response()->json(['message' => $e->getMessage()], 500);
+//     }
+
+//     // return response()->json([
+//     //     'message' => 'Pengumuman berhasil dibuat',
+//     //     'announcement' => $announcement->load('attachments'),
+//     // ], 201);
+// }
+
+
 public function store(Request $request)
 {
     $validated = $request->validate([
@@ -30,32 +111,62 @@ public function store(Request $request)
         'attachments.*' => 'file|mimes:jpg,jpeg,png,pdf,doc,docx|max:10240',
     ]);
 
-    $validated['created_by'] = $request->user()->id;
-    $announcement = Announcement::create($validated);
+    DB::beginTransaction();
+    try {
+        // HANYA 1 CREATE
+        $announcement = Announcement::create([
+            'title' => $validated['title'],
+            'content' => $validated['content'],
+            'is_displayed' => $validated['is_displayed'] ?? true,
+            'created_by' => auth()->id(),
+        ]);
 
-    // Handle attachments
-    if ($request->hasFile('attachments')) {
-        $attachmentIds = [];
-        foreach ($request->file('attachments') as $file) {
-            $path = $file->store('attachments', 'public');
-            $attachment = Attachment::create([
-                'file_name' => $file->getClientOriginalName(),
-                'file_path' => $path,
-                'file_type' => $file->getMimeType(),
-                'file_size' => $file->getSize(),
-            ]);
-            $attachmentIds[] = $attachment->id;
+        // Handle attachments
+        if ($request->hasFile('attachments')) {
+            $attachmentIds = [];
+            foreach ($request->file('attachments') as $file) {
+                $path = $file->store('attachments', 'public');
+                $attachment = Attachment::create([
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_path' => $path,
+                    'file_type' => $file->getMimeType(),
+                    'file_size' => $file->getSize(),
+                ]);
+                $attachmentIds[] = $attachment->id;
+            }
+            $announcement->attachments()->attach($attachmentIds);
         }
-        $announcement->attachments()->attach($attachmentIds);
+
+        // Send WhatsApp - HANYA 1X
+        $users = User::whereNotNull('whatsapp_number')->get();
+        foreach ($users as $user) {
+            $message = "📢 *PENGUMUMAN BARU*\n\n" .
+                      "📌 {$announcement->title}\n\n" .
+                      "{$announcement->content}\n\n" .
+                      "_Pengumuman dari: " . auth()->user()->name . "_";
+
+            SendWhatsAppNotification::dispatch(
+                $user->whatsapp_number,
+                $message,
+                'announcement',
+                'created',
+                $announcement->id
+            );
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'message' => 'Pengumuman berhasil dibuat',
+            'announcement' => $announcement->load('attachments'),
+        ], 201);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return response()->json(['message' => $e->getMessage()], 500);
     }
-
-    return response()->json([
-        'message' => 'Pengumuman berhasil dibuat',
-        'announcement' => $announcement->load('attachments'),
-    ], 201);
 }
-
-    public function show($id)
+public function show($id)
     {
         $announcement = Announcement::with(['attachments', 'creator'])->findOrFail($id);
         return response()->json($announcement);

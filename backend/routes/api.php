@@ -6,6 +6,7 @@ use App\Http\Controllers\API\RoomController;
 use App\Http\Controllers\API\UserController;
 use App\Http\Controllers\API\ProfileController;
 use App\Http\Controllers\API\MyAgendaController;
+use App\Http\Controllers\API\WhatsAppController;
 use App\Http\Controllers\API\ParticipantController;
 use App\Http\Controllers\API\AnnouncementController;
 use App\Http\Controllers\API\OfficeAgendaController;
@@ -69,5 +70,11 @@ Route::middleware('role:super_admin,admin')->group(function () {
         Route::post('announcements', [AnnouncementController::class, 'store']);
         Route::put('announcements/{id}', [AnnouncementController::class, 'update']);
         Route::delete('announcements/{id}', [AnnouncementController::class, 'destroy']);
+    });
+
+    Route::middleware('role:super_admin,admin')->group(function () {
+        Route::get('whatsapp/status', [WhatsAppController::class, 'status']);
+        Route::get('whatsapp/logs', [WhatsAppController::class, 'logs']);
+        Route::post('whatsapp/send-test', [WhatsAppController::class, 'sendTest']);
     });
 });

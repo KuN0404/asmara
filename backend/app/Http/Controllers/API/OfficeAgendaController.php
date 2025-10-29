@@ -5,10 +5,13 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\OfficeAgenda;
 use App\Models\Attachment;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Jobs\SendWhatsAppNotification;
+use Carbon\Carbon;
 
 class OfficeAgendaController extends Controller
 {
@@ -17,40 +20,32 @@ class OfficeAgendaController extends Controller
         try {
             $query = OfficeAgenda::query();
 
-            // Eager load dengan pengecekan relasi
             $query->with([
                 'room:id,name,capacity',
-                'creator:id,name,email'
+                'creator:id,name,email',
+                'participants' => function($q) {
+                    $q->select('participants.id', 'participants.name', 'participants.email', 'participants.organization');
+                },
+                'userParticipants' => function($q) {
+                    $q->select('users.id', 'users.name', 'users.email');
+                },
+                'attachments' => function($q) {
+                    $q->select('attachments.id', 'attachments.file_name', 'attachments.file_path', 'attachments.file_type', 'attachments.file_size');
+                }
             ]);
 
-            // Load participants dengan pengecekan
-            $query->with(['participants' => function($q) {
-                $q->select('participants.id', 'participants.name', 'participants.email', 'participants.organization');
-            }]);
-
-            $query->with(['userParticipants' => function($q) {
-                $q->select('users.id', 'users.name', 'users.email');
-            }]);
-
-            $query->with(['attachments' => function($q) {
-                $q->select('attachments.id', 'attachments.file_name', 'attachments.file_path', 'attachments.file_type', 'attachments.file_size');
-            }]);
-
-            // Filter by date range
             if ($request->has('start_date')) {
-                $query->where('start_at', '>=', $request->start_date);
+                $query->whereDate('start_at', '>=', $request->start_date);
             }
 
             if ($request->has('end_date')) {
-                $query->where('start_at', '<=', $request->end_date);
+                $query->whereDate('start_at', '<=', $request->end_date);
             }
 
-            // Filter by status
             if ($request->has('status')) {
                 $query->where('status', $request->status);
             }
 
-            // Filter by agenda type
             if ($request->has('agenda_type')) {
                 $query->where('agenda_type', $request->agenda_type);
             }
@@ -58,11 +53,8 @@ class OfficeAgendaController extends Controller
             $perPage = $request->get('per_page', 15);
 
             if ($perPage == 500) {
-                // Return all without pagination
                 $agendas = $query->orderBy('start_at', 'desc')->get();
-                return response()->json([
-                    'data' => $agendas
-                ]);
+                return response()->json(['data' => $agendas]);
             }
 
             $agendas = $query->orderBy('start_at', 'desc')->paginate($perPage);
@@ -70,8 +62,6 @@ class OfficeAgendaController extends Controller
             return response()->json($agendas);
         } catch (\Exception $e) {
             Log::error('Error loading agendas: ' . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
-
             return response()->json([
                 'message' => 'Failed to load agendas',
                 'error' => $e->getMessage()
@@ -79,151 +69,149 @@ class OfficeAgendaController extends Controller
         }
     }
 
-public function store(Request $request)
-{
-    try {
-        // Log::info('=== START CREATE AGENDA ===');
-        // Log::info('Request all data:', $request->all());
-        // Log::info('Request files:', $request->allFiles());
+    public function store(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'start_at' => 'required|date',
+                'until_at' => 'required|date|after:start_at',
+                'agenda_type' => 'required|string|in:meeting,event,training,conference,other',
+                'activity_type' => 'required|string|in:online,offline,hybrid',
+                'location' => 'required|string|max:255',
+                'room_id' => 'nullable|integer|exists:rooms,id',
+                'metting_link' => 'nullable|url|max:500',
+                'description' => 'nullable|string',
+                'status' => 'required|string|in:comming_soon,in_progress,schedule_change,completed,cancelled',
+                'participant_ids' => 'nullable|array',
+                'participant_ids.*' => 'integer|exists:participants,id',
+                'user_participant_ids' => 'required|array|min:1',
+                'user_participant_ids.*' => 'integer|exists:users,id',
+                'attachments' => 'nullable|array',
+                'attachments.*' => 'file|max:2048|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png',
+            ]);
 
-        // Validasi dengan pesan error yang jelas
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'start_at' => 'required|date',
-            'until_at' => 'required|date|after:start_at',
-            'agenda_type' => 'required|string|in:meeting,event,training,conference,other',
-            'activity_type' => 'required|string|in:online,offline,hybrid',
-            'location' => 'required|string|max:255',
-            'room_id' => 'nullable|integer|exists:rooms,id',
-            'metting_link' => 'nullable|url|max:500',
-            'description' => 'nullable|string',
-            'status' => 'required|string|in:comming_soon,in_progress,schedule_change,completed,cancelled',
-            'participant_ids' => 'nullable|array',
-            'participant_ids.*' => 'integer|exists:participants,id',
-            'user_participant_ids' => 'required|array|min:1',
-            'user_participant_ids.*' => 'integer|exists:users,id',
-            'attachments' => 'nullable|array',
-            'attachments.*' => 'file|max:2048|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png',
-        ]);
+            DB::beginTransaction();
 
-        Log::info('Validation passed');
+            $agendaData = [
+                'title' => $validated['title'],
+                'start_at' => $validated['start_at'],
+                'until_at' => $validated['until_at'],
+                'agenda_type' => $validated['agenda_type'],
+                'activity_type' => $validated['activity_type'],
+                'location' => $validated['location'],
+                'status' => $validated['status'],
+                'created_by' => auth()->id(),
+            ];
 
-        DB::beginTransaction();
+            if (isset($validated['room_id'])) {
+                $agendaData['room_id'] = $validated['room_id'];
+            }
+            if (isset($validated['metting_link'])) {
+                $agendaData['metting_link'] = $validated['metting_link'];
+            }
+            if (isset($validated['description'])) {
+                $agendaData['description'] = $validated['description'];
+            }
 
-        // Create agenda dengan data yang sudah divalidasi
-        $agendaData = [
-            'title' => $validated['title'],
-            'start_at' => $validated['start_at'],
-            'until_at' => $validated['until_at'],
-            'agenda_type' => $validated['agenda_type'],
-            'activity_type' => $validated['activity_type'],
-            'location' => $validated['location'],
-            'status' => $validated['status'],
-            'created_by' => auth()->id(),
-        ];
+            $agenda = OfficeAgenda::create($agendaData);
 
-        // Tambahkan optional fields jika ada
-        if (isset($validated['room_id'])) {
-            $agendaData['room_id'] = $validated['room_id'];
-        }
-        if (isset($validated['metting_link'])) {
-            $agendaData['metting_link'] = $validated['metting_link'];
-        }
-        if (isset($validated['description'])) {
-            $agendaData['description'] = $validated['description'];
-        }
+            // Attach external participants
+            if (!empty($validated['participant_ids'])) {
+                foreach ($validated['participant_ids'] as $participantId) {
+                    DB::table('office_agenda_participant')->insert([
+                        'office_agenda_id' => $agenda->id,
+                        'participant_id' => $participantId,
+                        'user_id' => null,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
 
-        Log::info('Creating agenda with data:', $agendaData);
-
-        $agenda = OfficeAgenda::create($agendaData);
-
-        Log::info('Agenda created with ID: ' . $agenda->id);
-
-        // Attach external participants
-        if (!empty($validated['participant_ids'])) {
-            foreach ($validated['participant_ids'] as $participantId) {
+            // Attach internal participants (users)
+            foreach ($validated['user_participant_ids'] as $userId) {
                 DB::table('office_agenda_participant')->insert([
                     'office_agenda_id' => $agenda->id,
-                    'participant_id' => $participantId,
-                    'user_id' => null,
+                    'participant_id' => null,
+                    'user_id' => $userId,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
             }
-            Log::info('External participants attached: ' . count($validated['participant_ids']));
-        }
 
-        // Attach internal participants (users) - REQUIRED
-        foreach ($validated['user_participant_ids'] as $userId) {
-            DB::table('office_agenda_participant')->insert([
-                'office_agenda_id' => $agenda->id,
-                'participant_id' => null,
-                'user_id' => $userId,
-                'created_at' => now(),
-                'updated_at' => now(),
+            // Handle file uploads
+            if ($request->hasFile('attachments')) {
+                $attachmentIds = $this->handleFileUploads($request->file('attachments'));
+
+                foreach ($attachmentIds as $attachmentId) {
+                    DB::table('office_agenda_attachment')->insert([
+                        'office_agenda_id' => $agenda->id,
+                        'attachment_id' => $attachmentId,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+
+            // 🚀 SEND WHATSAPP NOTIFICATION TO INTERNAL PARTICIPANTS
+            $participants = User::whereIn('id', $validated['user_participant_ids'])->get();
+            $agenda->load('room');
+
+            foreach ($participants as $user) {
+                if ($user->whatsapp_number) {
+                    $message = "📅 *AGENDA KANTOR BARU*\n\n" .
+                              "📌 {$agenda->title}\n" .
+                              "📆 " . Carbon::parse($agenda->start_at)->format('d M Y') . "\n" .
+                              "🕐 " . Carbon::parse($agenda->start_at)->format('H:i') . " - " . Carbon::parse($agenda->until_at)->format('H:i') . " WIB\n" .
+                              "📍 {$agenda->location}\n" .
+                              ($agenda->room ? "🚪 Ruangan: {$agenda->room->name}\n" : "") .
+                              ($agenda->metting_link ? "🔗 Link: {$agenda->metting_link}\n" : "") .
+                              ($agenda->description ? "\n📝 {$agenda->description}\n" : "") .
+                              "\n_Dibuat oleh: " . auth()->user()->name . "_";
+
+                    SendWhatsAppNotification::dispatch(
+                        $user->whatsapp_number,
+                        $message,
+                        'office_agenda',
+                        'created',
+                        $agenda->id
+                    );
+                }
+            }
+
+            DB::commit();
+
+            $agenda->load([
+                'room:id,name,capacity',
+                'participants:id,name,email,organization',
+                'userParticipants:id,name,email',
+                'attachments:id,file_name,file_path,file_type,file_size',
+                'creator:id,name,email'
             ]);
+
+            return response()->json([
+                'message' => 'Agenda created successfully',
+                'data' => $agenda
+            ], 201);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error creating agenda: ' . $e->getMessage());
+
+            return response()->json([
+                'message' => 'Failed to create agenda',
+                'error' => $e->getMessage()
+            ], 500);
         }
-        Log::info('Internal participants attached: ' . count($validated['user_participant_ids']));
-
-        // Handle file uploads
-        if ($request->hasFile('attachments')) {
-            Log::info('Processing ' . count($request->file('attachments')) . ' file uploads');
-            $attachmentIds = $this->handleFileUploads($request->file('attachments'));
-
-            foreach ($attachmentIds as $attachmentId) {
-                DB::table('office_agenda_attachment')->insert([
-                    'office_agenda_id' => $agenda->id,
-                    'attachment_id' => $attachmentId,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-            Log::info('Attachments uploaded and linked: ' . count($attachmentIds));
-        }
-
-        DB::commit();
-        Log::info('Transaction committed successfully');
-
-        // Load relationships
-        $agenda->load([
-            'room:id,name,capacity',
-            'participants:id,name,email,organization',
-            'userParticipants:id,name,email',
-            'attachments:id,file_name,file_path,file_type,file_size',
-            'creator:id,name,email'
-        ]);
-
-        // Log::info('=== END CREATE AGENDA SUCCESS ===');
-
-        return response()->json([
-            'message' => 'Agenda created successfully',
-            'data' => $agenda
-        ], 201);
-
-    } catch (\Illuminate\Validation\ValidationException $e) {
-        DB::rollBack();
-        Log::error('Validation error:', $e->errors());
-
-        return response()->json([
-            'message' => 'Validation failed',
-            'errors' => $e->errors()
-        ], 422);
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error('=== ERROR CREATE AGENDA ===');
-        Log::error('Error message: ' . $e->getMessage());
-        Log::error('Error file: ' . $e->getFile() . ' line ' . $e->getLine());
-        Log::error('Stack trace: ' . $e->getTraceAsString());
-
-        return response()->json([
-            'message' => 'Failed to create agenda',
-            'error' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine()
-        ], 500);
     }
-}
 
     public function show($id)
     {
@@ -252,9 +240,6 @@ public function store(Request $request)
         try {
             $officeAgenda = OfficeAgenda::findOrFail($id);
 
-            Log::info('Updating agenda ID: ' . $id);
-            Log::info('Update data:', $request->all());
-
             $validated = $request->validate([
                 'title' => 'sometimes|string|max:255',
                 'start_at' => 'sometimes|date',
@@ -276,7 +261,6 @@ public function store(Request $request)
 
             DB::beginTransaction();
 
-            // Update agenda basic info
             $updateData = [];
             if (isset($validated['title'])) $updateData['title'] = $validated['title'];
             if (isset($validated['start_at'])) $updateData['start_at'] = $validated['start_at'];
@@ -309,7 +293,7 @@ public function store(Request $request)
                 }
             }
 
-            // Update internal participants (users)
+            // Update internal participants
             if (isset($validated['user_participant_ids'])) {
                 DB::table('office_agenda_participant')
                     ->where('office_agenda_id', $officeAgenda->id)
@@ -343,7 +327,6 @@ public function store(Request $request)
 
             DB::commit();
 
-            // Load relationships
             $officeAgenda->load([
                 'room:id,name,capacity',
                 'participants:id,name,email,organization',
